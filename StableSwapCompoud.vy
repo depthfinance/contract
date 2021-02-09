@@ -152,6 +152,8 @@ def __init__(_coins: address[N_COINS], _underlying_coins: address[N_COINS],
         assert _coins[i] != ZERO_ADDRESS
         assert _underlying_coins[i] != ZERO_ADDRESS
         self.balances[i] = 0
+    assert _handle_lend_contract_address!= ZERO_ADDRESS
+    assert _lend_contract_address!= ZERO_ADDRESS
     self.coins = _coins
     self.underlying_coins = _underlying_coins
     #self.A = _A
@@ -667,6 +669,7 @@ def remove_liquidity_imbalance(amounts: uint256[N_COINS], max_burn_amount: uint2
 @public
 def set_handle_lend_contract_address(_address: address):
     assert msg.sender == self.owner  # dev: only owner
+    assert _address!= ZERO_ADDRESS
     self.handle_lend_contract_address = _address
     log.SetHandleLendContractAddress(_address)
 
