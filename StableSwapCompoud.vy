@@ -666,6 +666,7 @@ def remove_liquidity_imbalance(amounts: uint256[N_COINS], max_burn_amount: uint2
 ### Admin functions ###
 @public
 def set_handle_lend_contract_address(_address: address):
+    assert msg.sender == self.owner  # dev: only owner
     self.handle_lend_contract_address = _address
     log.SetHandleLendContractAddress(_address)
 
