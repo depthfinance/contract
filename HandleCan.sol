@@ -1,4 +1,4 @@
-pragma solidity 0.5.16;
+pragma solidity ^0.6.0;
 library SafeMath {
 
     function mul(uint256 a, uint256 b) internal pure returns (uint256) {
@@ -79,31 +79,20 @@ library SafeMath {
         return y;
     }
 }
-contract ERC20 {
+interface ERC20 {
     using SafeMath for uint256;
-    mapping (address => uint256) internal _balances;
-    mapping (address => mapping (address => uint256)) internal _allowed;
-
-    event Transfer(address indexed from, address indexed to, uint256 value);
-    event Approval(address indexed owner, address indexed spender, uint256 value);
-
-    uint256 internal _totalSupply;
 
     /**
     * @dev Total number of tokens in existence
     */
-    function totalSupply() public view returns (uint256) {
-        return _totalSupply;
-    }
+    function totalSupply() external view returns (uint256);
 
     /**
     * @dev Gets the balance of the specified address.
     * @param owner The address to query the balance of.
     * @return A uint256 representing the amount owned by the passed address.
     */
-    function balanceOf(address owner) public view returns (uint256) {
-        return _balances[owner];
-    }
+    function balanceOf(address owner) external view returns (uint256);
 
     /**
     * @dev Function to check the amount of tokens that an owner allowed to a spender.
@@ -111,19 +100,14 @@ contract ERC20 {
     * @param spender address The address which will spend the funds.
     * @return A uint256 specifying the amount of tokens still available for the spender.
     */
-    function allowance(address owner, address spender) public view returns (uint256) {
-        return _allowed[owner][spender];
-    }
+    function allowance(address owner, address spender) external view returns (uint256);
 
     /**
     * @dev Transfer token to a specified address
     * @param to The address to transfer to.
     * @param value The amount to be transferred.
     */
-    function transfer(address to, uint256 value) public returns (bool) {
-        _transfer(msg.sender, to, value);
-        return true;
-    }
+    function transfer(address to, uint256 value) external returns (bool);
 
     /**
     * @dev Approve the passed address to spend the specified amount of tokens on behalf of msg.sender.
@@ -134,11 +118,7 @@ contract ERC20 {
     * @param spender The address which will spend the funds.
     * @param value The amount of tokens to be spent.
     */
-    function approve(address spender, uint256 value) public returns (bool) {
-        _allowed[msg.sender][spender] = value;
-        emit Approval(msg.sender, spender, value);
-        return true;
-    }
+    function approve(address spender, uint256 value) external returns (bool);
 
     /**
     * @dev Transfer tokens from one address to another.
@@ -148,25 +128,17 @@ contract ERC20 {
     * @param to address The address which you want to transfer to
     * @param value uint256 the amount of tokens to be transferred
     */
-    function transferFrom(address from, address to, uint256 value) public returns (bool) {
-        _allowed[from][msg.sender] = _allowed[from][msg.sender].sub(value);
-        _transfer(from, to, value);
-        return true;
-    }
-
-    function _transfer(address from, address to, uint256 value) internal {
-        require(to != address(0));
-        _balances[from] = _balances[from].sub(value);
-        _balances[to] = _balances[to].add(value);
-        emit Transfer(from, to, value);
-    }
+    function transferFrom(address from, address to, uint256 value) external returns (bool);
 
 }
-contract CERC20 is ERC20 {
+interface CERC20 is ERC20 {
     function mint(uint256) external returns (uint256);
-
 }
-contract MDexRouter {
+interface ClaimCan is ERC20 {
+    function claimCan(address holder) external;
+}
+
+interface MDexRouter {
     function swapExactTokensForTokens(uint amountIn, uint amountOutMin, address[] calldata path, address to, uint deadline) external returns (uint[] memory amounts);
 }
 contract handleCan{
@@ -177,6 +149,12 @@ contract handleCan{
     ERC20 constant wht = ERC20(0x5545153CCFcA01fbd7Dd11C0b23ba694D9509A6F);
     CERC20 constant chusd = CERC20(0x9a57eAB16d371048c56cbE0c4D608096aEC5b405);
     CERC20 constant cusdt = CERC20(0x3dA74C09ccb8faBa3153b7f6189dDA9d7F28156A);
+    ClaimCan constant claimCanContract = ClaimCan(0x8955aeC67f06875Ee98d69e6fe5BDEA7B60e9770);
+
+    function claim_CAN() external {
+        // 帮主合约claimCan，将claim的逻辑写到这里，防止后期Channels修改claim的合约
+        claimCanContract.claimCan(msg.sender);
+    }
 
     function swap_CAN_to_cToken(bool is_HUSD, uint256 canAmount) external returns (uint256){
         require(can.transferFrom(msg.sender, address(this), canAmount));
@@ -185,23 +163,22 @@ contract handleCan{
         path[1] = address(wht);
         path[2] = is_HUSD ? address(husd) : address(usdt);
         can.approve(address(mdex), canAmount);
-        uint256[] memory amounts = mdex.swapExactTokensForTokens(canAmount, 0, path, address(this), now);
-        if(amounts[2]==0)
-            return 0;
-
-        if(is_HUSD){
-            husd.approve(address(chusd),amounts[2]);
-            uint256 minted= chusd.mint(amounts[2]);
-            chusd.approve(msg.sender, minted);
-            return minted;
-
-        }
-        else{
-            usdt.approve(address(cusdt),amounts[2]);
-            uint256 minted= cusdt.mint(amounts[2]);
-            cusdt.approve(msg.sender, minted);
-            return minted;
-
+        try mdex.swapExactTokensForTokens(canAmount, 0, path, address(this), now) returns (uint256[] memory amounts) {
+            if(amounts[2]==0)
+                return 0;
+            if (is_HUSD) {
+                husd.approve(address(chusd),amounts[2]);
+                uint256 minted= chusd.mint(amounts[2]);
+                chusd.approve(msg.sender, minted);
+                return minted;
+            } else{
+                usdt.approve(address(cusdt),amounts[2]);
+                uint256 minted= cusdt.mint(amounts[2]);
+                cusdt.approve(msg.sender, minted);
+                return minted;
+            }
+        } catch (bytes memory /*lowLevelData*/) {
+            return 0;  // Will not get here
         }
     }
 }
