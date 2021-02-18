@@ -53,6 +53,7 @@ contract USDT:
 # This contract handle CAN token
 contract HandleLend:
     def swap_CAN_to_cToken(isHUSD: bool, _value: uint256) -> uint256: modifying
+    def claim_CAN(): modifying
 
 # This can (and needs to) be changed at compile time
 N_COINS: constant(int128) = 2  # <- change
@@ -152,8 +153,6 @@ def __init__(_coins: address[N_COINS], _underlying_coins: address[N_COINS],
         assert _coins[i] != ZERO_ADDRESS
         assert _underlying_coins[i] != ZERO_ADDRESS
         self.balances[i] = 0
-    assert _handle_lend_contract_address!= ZERO_ADDRESS
-    assert _lend_contract_address!= ZERO_ADDRESS
     self.coins = _coins
     self.underlying_coins = _underlying_coins
     #self.A = _A
@@ -169,23 +168,7 @@ def __init__(_coins: address[N_COINS], _underlying_coins: address[N_COINS],
 
     self.lend_token = ERC20(_lend_contract_address)
 
-@private
-def _collect_lend_token():
-    lend_token_balance: uint256 = self.lend_token.balanceOf(self)
-    if lend_token_balance == 0:
-        return
-    self.lend_token.approve(self.handle_lend_contract_address, lend_token_balance)
-    precisions: uint256[N_COINS] = PRECISION_MUL
-    is_HUSD: bool = (self.balances[0] * precisions[0]) < (self.balances[1] * precisions[1])
-    minted: uint256 = HandleLend(self.handle_lend_contract_address).swap_CAN_to_cToken(is_HUSD, lend_token_balance)
-    if is_HUSD:
-        ERC20(self.coins[0]).transferFrom(self.handle_lend_contract_address, self, minted)
-        #add balance
-        self.balances[0] = self.balances[0] + minted
-    else:
-        ERC20(self.coins[1]).transferFrom(self.handle_lend_contract_address, self, minted)
-        #add balance
-        self.balances[1] = self.balances[1] + minted
+
 @private
 @constant
 def _A() -> uint256:
@@ -212,10 +195,10 @@ def _A() -> uint256:
 def A() -> uint256:
     return self._A() / A_PRECISION
 
-@public
-@constant
-def A_precise() -> uint256:
-    return self._A()
+# @public
+# @constant
+# def A_precise() -> uint256:
+#     return self._A()
 
 @private
 @constant
@@ -297,6 +280,24 @@ def get_D(xp: uint256[N_COINS], amp: uint256) -> uint256:
 def get_D_mem(rates: uint256[N_COINS], _balances: uint256[N_COINS], amp: uint256) -> uint256:
     return self.get_D(self._xp_mem(rates, _balances),amp)
 
+@private
+def collect_lend_token():
+    HandleLend(self.handle_lend_contract_address).claim_CAN()
+    lend_token_balance: uint256 = self.lend_token.balanceOf(self)
+    if lend_token_balance == 0:
+        return
+    self.lend_token.approve(self.handle_lend_contract_address, lend_token_balance)
+    xp: uint256[N_COINS] = self._xp(self._stored_rates())
+    is_HUSD: bool = xp[0] < xp[1]
+    minted: uint256 = HandleLend(self.handle_lend_contract_address).swap_CAN_to_cToken(is_HUSD, lend_token_balance)
+    if is_HUSD:
+        ERC20(self.coins[0]).transferFrom(self.handle_lend_contract_address, self, minted)
+        #add balance
+        self.balances[0] = self.balances[0] + minted
+    else:
+        ERC20(self.coins[1]).transferFrom(self.handle_lend_contract_address, self, minted)
+        #add balance
+        self.balances[1] = self.balances[1] + minted
 
 @public
 @constant
@@ -305,7 +306,7 @@ def get_virtual_price() -> uint256:
     Returns portfolio virtual price (for calculating profit)
     scaled up by 1e18
     """
-    amp: uint256 = self._A()
+    amp: uint256 = self._A() / A_PRECISION
     D: uint256 = self.get_D(self._xp(self._stored_rates()),amp)
     # D is in the units similar to DAI (e.g. converted to precision 1e18)
     # When balanced, D = n * x_u - total virtual value of the portfolio
@@ -324,7 +325,7 @@ def calc_token_amount(amounts: uint256[N_COINS], deposit: bool) -> uint256:
     """
     _balances: uint256[N_COINS] = self.balances
     rates: uint256[N_COINS] = self._stored_rates()
-    amp: uint256 = self._A()
+    amp: uint256 = self._A() / A_PRECISION
     D0: uint256 = self.get_D_mem(rates, _balances,amp)
     for i in range(N_COINS):
         if deposit:
@@ -347,8 +348,8 @@ def add_liquidity(amounts: uint256[N_COINS], min_mint_amount: uint256):
     # Amounts is amounts of c-tokens
     assert not self.is_killed
 
-    self._collect_lend_token()
-    amp: uint256 = self._A()
+    self.collect_lend_token()
+    amp: uint256 = self._A() / A_PRECISION
     tethered: bool[N_COINS] = TETHERED
     use_lending: bool[N_COINS] = USE_LENDING
     fees: uint256[N_COINS] = ZEROS
@@ -422,7 +423,7 @@ def get_y(i: int128, j: int128, x: uint256, _xp: uint256[N_COINS]) -> uint256:
     # x in the input is converted to the same price/precision
 
     assert (i != j) and (i >= 0) and (j >= 0) and (i < N_COINS) and (j < N_COINS)
-    amp: uint256 = self._A()
+    amp: uint256 = self._A() / A_PRECISION
     D: uint256 = self.get_D(_xp,amp)
     c: uint256 = D
     S_: uint256 = 0
@@ -594,8 +595,10 @@ def exchange_underlying(i: int128, j: int128, dx: uint256, min_dy: uint256):
 
 @public
 @nonreentrant('lock')
-def remove_liquidity(_amount: uint256, min_amounts: uint256[N_COINS]):
-    self._collect_lend_token()
+def remove_liquidity(_amount: uint256, min_amounts: uint256[N_COINS], collect_token: bool):
+    if collect_token:
+        self.collect_lend_token()
+
     total_supply: uint256 = self.token.totalSupply()
     amounts: uint256[N_COINS] = ZEROS
     fees: uint256[N_COINS] = ZEROS
@@ -620,12 +623,14 @@ def remove_liquidity(_amount: uint256, min_amounts: uint256[N_COINS]):
 
 @public
 @nonreentrant('lock')
-def remove_liquidity_imbalance(amounts: uint256[N_COINS], max_burn_amount: uint256):
+def remove_liquidity_imbalance(amounts: uint256[N_COINS], max_burn_amount: uint256, collect_token: bool):
     assert not self.is_killed
-    self._collect_lend_token()
+    if collect_token:
+        self.collect_lend_token()
+
     tethered: bool[N_COINS] = TETHERED
     use_lending: bool[N_COINS] = USE_LENDING
-    amp: uint256 = self._A()
+    amp: uint256 = self._A() / A_PRECISION
     token_supply: uint256 = self.token.totalSupply()
     assert token_supply > 0
     _fee: uint256 = self.fee * N_COINS / (4 * (N_COINS - 1))
@@ -662,14 +667,12 @@ def remove_liquidity_imbalance(amounts: uint256[N_COINS], max_burn_amount: uint2
             assert_modifiable(cERC20(self.coins[i]).transfer(msg.sender, amounts[i]))
     self.token.burnFrom(msg.sender, token_amount)  # Will raise if not enough
 
-    log.RemoveLiquidityImbalance(msg.sender, amounts, fees, D1, token_supply - token_amount)
-
+    log.RemoveLiquidityImbalance(msg.sender, amounts, fees, D1, token_supply - token_amount)    
 
 ### Admin functions ###
 @public
 def set_handle_lend_contract_address(_address: address):
     assert msg.sender == self.owner  # dev: only owner
-    assert _address!= ZERO_ADDRESS
     self.handle_lend_contract_address = _address
     log.SetHandleLendContractAddress(_address)
 
