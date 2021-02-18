@@ -33,8 +33,8 @@ contract USDT:
 
 contract Curve:
     def add_liquidity(amounts: uint256[N_COINS], min_mint_amount: uint256): modifying
-    def remove_liquidity(_amount: uint256, min_amounts: uint256[N_COINS]): modifying
-    def remove_liquidity_imbalance(amounts: uint256[N_COINS], max_burn_amount: uint256): modifying
+    def remove_liquidity(_amount: uint256, min_amounts: uint256[N_COINS], collect_token: bool): modifying
+    def remove_liquidity_imbalance(amounts: uint256[N_COINS], max_burn_amount: uint256, collect_token: bool): modifying
     def balances(i: int128) -> uint256: constant
     def A() -> uint256: constant
     def fee() -> uint256: constant
@@ -134,18 +134,18 @@ def _send_all(_addr: address, min_uamounts: uint256[N_COINS], one: int128):
 
 @public
 @nonreentrant('lock')
-def remove_liquidity(_amount: uint256, min_uamounts: uint256[N_COINS]):
+def remove_liquidity(_amount: uint256, min_uamounts: uint256[N_COINS], collect_token: bool):
     zeros: uint256[N_COINS] = ZEROS
 
     assert_modifiable(ERC20(self.token).transferFrom(msg.sender, self, _amount))
-    Curve(self.curve).remove_liquidity(_amount, zeros)
+    Curve(self.curve).remove_liquidity(_amount, zeros, collect_token)
 
     self._send_all(msg.sender, min_uamounts, -1)
 
 
 @public
 @nonreentrant('lock')
-def remove_liquidity_imbalance(uamounts: uint256[N_COINS], max_burn_amount: uint256):
+def remove_liquidity_imbalance(uamounts: uint256[N_COINS], max_burn_amount: uint256, collect_token: bool):
     """
     Get max_burn_amount in, remove requested liquidity and transfer back what is left
     """
@@ -166,7 +166,7 @@ def remove_liquidity_imbalance(uamounts: uint256[N_COINS], max_burn_amount: uint
         _tokens = max_burn_amount
     assert_modifiable(ERC20(_token).transferFrom(msg.sender, self, _tokens))
 
-    Curve(self.curve).remove_liquidity_imbalance(amounts, max_burn_amount)
+    Curve(self.curve).remove_liquidity_imbalance(amounts, max_burn_amount, collect_token)
 
     # Transfer unused tokens back
     _tokens = ERC20(_token).balanceOf(self)
@@ -323,7 +323,7 @@ def calc_withdraw_one_coin(_token_amount: uint256, i: int128) -> uint256:
 
 @public
 @nonreentrant('lock')
-def remove_liquidity_one_coin(_token_amount: uint256, i: int128, min_uamount: uint256, donate_dust: bool = False):
+def remove_liquidity_one_coin(_token_amount: uint256, i: int128, min_uamount: uint256, collect_token: bool, donate_dust: bool = False):
     """
     Remove _amount of liquidity all in a form of coin i
     """
@@ -346,7 +346,7 @@ def remove_liquidity_one_coin(_token_amount: uint256, i: int128, min_uamount: ui
     amounts: uint256[N_COINS] = ZEROS
     amounts[i] = dy * LENDING_PRECISION / rates[i]
     token_amount_before: uint256 = ERC20(_token).balanceOf(self)
-    Curve(self.curve).remove_liquidity_imbalance(amounts, _token_amount)
+    Curve(self.curve).remove_liquidity_imbalance(amounts, _token_amount, collect_token)
 
     # Unwrap and transfer all the coins we've got
     self._send_all(msg.sender, ZEROS, i)
