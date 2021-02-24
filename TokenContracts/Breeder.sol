@@ -1688,6 +1688,7 @@ contract PiggyBreeder is Ownable {
     // Info of each user that stakes LP tokens.
     mapping(uint256 => mapping(address => UserInfo)) public userInfo;
     mapping(uint256 => address[]) public userAddresses;
+    mapping(uint256 => mapping(address => uint)) private userPoolAddresses;
 
     // Total allocation points. Must be the sum of all allocation points in all pools.
     uint256 public totalAllocPoint;
@@ -1718,7 +1719,7 @@ contract PiggyBreeder is Ownable {
         devMiningRate = _devMiningRate;
         enableClaimBlock = _enableClaimBlock;
 
-        totalAllocPoint = 0;
+        //totalAllocPoint = 0;
     }
 
     function poolLength() external view returns (uint256) {
@@ -1853,7 +1854,7 @@ contract PiggyBreeder is Ownable {
         }
     }
 
-    // Return piggyPerBlock, baseOn power  --> piggyPerBlock * (reduceRate/100)^power
+    // Return piggyPerBlock, baseOn power  --> piggyPerBlock * (reduceRate/1000)^power
     function getPiggyPerBlock(uint256 _power) public view returns (uint256){
         if (_power == 0) {
             return piggyPerBlock;
@@ -1962,7 +1963,7 @@ contract PiggyBreeder is Ownable {
         uint256 piggyReward = multiplier.mul(getPiggyPerBlock(power)).mul(pool.allocPoint).div(totalAllocPoint);
 
         // mint
-        piggy.mint(devAddr, piggyReward.mul(devMiningRate).div(100));
+        piggy.mint(devAddr, piggyReward.mul(devMiningRate).div(1000));
         piggy.mint(address(this), piggyReward);
 
         //update pool
@@ -1974,7 +1975,7 @@ contract PiggyBreeder is Ownable {
     // Add a new lp to the pool. Can only be called by the owner.
     // DO NOT add the same LP token more than once. Rewards will be messed up if you do.
     function add(uint256 _allocPoint, IERC20 _lpToken, IMigrator _migrator, bool _withUpdate) public onlyOwner {
-
+        require(address(_lpToken) != address(0), "lp token is the zero address");
         if (_withUpdate) {
             massUpdatePools();
         }
@@ -2027,7 +2028,11 @@ contract PiggyBreeder is Ownable {
             pool.lpToken.safeTransferFrom(address(msg.sender), address(this), _amount);
             user.amount = user.amount.add(_amount);
             pool.totalDeposit = pool.totalDeposit.add(_amount);
-            userAddresses[_pid].push(msg.sender);
+            uint hasAddress = userPoolAddresses[_pid][msg.sender];
+            if (hasAddress==0){
+                userPoolAddresses[_pid][msg.sender]=1;
+                userAddresses[_pid].push(msg.sender);
+            }
         }
 
         user.rewardDebt = user.amount.mul(pool.accPiggyPerShare).div(1e12);
@@ -2116,14 +2121,14 @@ contract PiggyBreeder is Ownable {
         UserInfo storage user = userInfo[_pid][msg.sender];
 
         uint256 amount = user.amount;
-
-        // transfer LP tokens to user
-        pool.lpToken.safeTransfer(address(msg.sender), amount);
-
-        pool.totalDeposit = pool.totalDeposit.sub(user.amount);
         // update user info
         user.amount = 0;
         user.rewardDebt = 0;
+        // transfer LP tokens to user
+        pool.lpToken.safeTransfer(address(msg.sender), amount);
+
+        pool.totalDeposit = pool.totalDeposit.sub(amount);
+
 
         emit EmergencyWithdraw(msg.sender, _pid, amount);
     }
