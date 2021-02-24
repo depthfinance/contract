@@ -1963,7 +1963,7 @@ contract PiggyBreeder is Ownable {
         uint256 piggyReward = multiplier.mul(getPiggyPerBlock(power)).mul(pool.allocPoint).div(totalAllocPoint);
 
         // mint
-        piggy.mint(devAddr, piggyReward.mul(devMiningRate).div(1000));
+        piggy.mint(devAddr, piggyReward.mul(devMiningRate).div(100));
         piggy.mint(address(this), piggyReward);
 
         //update pool
