@@ -1,7 +1,7 @@
-## Depth smart contract
-###### These contracts are underlying smart contracts of the depth dApp.
+## Depth Smart Contracts
+### This repo contains the underlying smart contracts of the <a href="https://depth.fi">Depth</a> dApp.
 
-## Verified contracts
+## Verified Contract Links 
 | Contract | Link |
 | --- | ----------- |
 | Channels Deposit | todo |
