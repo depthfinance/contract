@@ -72,7 +72,7 @@ contract DepthOtcV1 is IOtcV1, Ownable {
   address public storageContractAddress;
   address public husdSwapAddress;//neet to convert taker token to husd
   address public daoAddress;
-
+  mapping (address=>bool) blackTokens;//if in black tokens.can not trade
   constructor(address _stakeTokenAddress, address _storageContractAddress,address _usdtToken,address _husdToken,address _usdtSwapAddress,address _husdSwapAddress,address _daoAddress) public {
     // Ensure the fee wallet is not null
     require(_usdtToken != address(0), "INVALID_USDT_Token_address");
@@ -131,7 +131,7 @@ contract DepthOtcV1 is IOtcV1, Ownable {
   ) public override {
       require(isPaused==false, "contract is paused");
     require(DOMAIN_CHAIN_ID == getChainId(), "CHAIN_ID_CHANGED");
-
+    require(!blackTokens[address(makerToken)]&&!blackTokens[address(takerToken)],"black token address!");
     // Ensure the expiry is not passed
     require(expiry > block.timestamp, "EXPIRY_PASSED");
     //if takerAddress is not zero.check the taker address
@@ -160,7 +160,7 @@ contract DepthOtcV1 is IOtcV1, Ownable {
     if (makerAddress != signatory) {
       require(authorized[makerAddress] == signatory, "UNAUTHORIZED");
     }
-
+    
     // Transfer token from taker to maker
     takerToken.safeTransferFrom(msg.sender, makerAddress, takerAmount);
     //transfer token from taker to contract.
@@ -444,5 +444,15 @@ contract DepthOtcV1 is IOtcV1, Ownable {
     // Ensure the signatory is not null
     require(signatory != address(0), "INVALID_SIG");
     return signatory;
+  }
+  
+  function addBlackToken(address _address) external onlyOwner {
+    blackTokens[_address] = true;
+  }
+
+  function removeBlackToken(address _address) external onlyOwner {
+    if (blackTokens[_address] ){
+        delete blackTokens[_address];
+    }
   }
 }
