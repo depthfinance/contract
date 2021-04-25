@@ -163,8 +163,8 @@ contract DepthOtcV1 is IOtcV1, Ownable {
     
     // Transfer token from taker to maker
     takerToken.safeTransferFrom(msg.sender, makerAddress, takerAmount);
-    //transfer token from taker to contract.
-    makerToken.safeTransfer(address(this), makerAmount);
+    //transfer token from maker to contract.
+    makerToken.safeTransferFrom(makerAddress,address(this), makerAmount);
     uint256 _feeAmount=_dealFee(makerAddress,makerToken,makerAmount,takerToken);
     
 
