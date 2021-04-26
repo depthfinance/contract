@@ -159,6 +159,14 @@ contract DAOPool {
         }
     }
     
+    function rewardsAmount() public view returns(uint256) {
+        if (sharesAndRewardsInfo.lastUpdatedEpochFlag < currentEpoch()) {
+            return HUSD.balanceOf(address(this));
+        } else {
+            return sharesAndRewardsInfo.activeShares;
+        }
+    }
+    
     function currentEpoch() public view returns(uint256) {
         uint256 period = block.timestamp - startTime;
         return SafeMath.div(period, epochLength);
@@ -171,11 +179,10 @@ contract DAOPool {
         uint256 totalAmount = shareAmount();
         if (totalAmount != 0 && user.lastRewardedEpoch < currentEpoch()) {
             uint256 HUSDBalance = HUSD.balanceOf(address(this));
-            
-            if (HUSDBalance < sharesAndRewardsInfo.rewards) {
+            if (HUSDBalance < rewardsAmount()) {
                 return SafeMath.div(SafeMath.mul(user.amount, HUSDBalance), totalAmount);
             } else {
-                return SafeMath.div(SafeMath.mul(user.amount, sharesAndRewardsInfo.rewards), totalAmount);
+                return SafeMath.div(SafeMath.mul(user.amount, rewardsAmount()), totalAmount);
             }
         } else {
             return 0;
@@ -196,6 +203,15 @@ contract DAOPool {
     }
     
     function unlockableAmount(address who) public view returns (uint256) {
+        UserInfo memory user = userInfo[who];
+        if (user.amount <= xDEP.balanceOf(who)) {
+            return user.amount;
+        } else {
+            return xDEP.balanceOf(who);
+        }
+    }
+    
+    function unstakableAmount(address who) public view returns (uint256) {
         UnlockRequest[] memory reqs = userUnlockRequests[who];
         uint256 sum = 0;
         for (uint256 i = 0; i < reqs.length; i++) {
@@ -203,12 +219,7 @@ contract DAOPool {
                 sum += reqs[i].amount;
             }
         }
-        uint256 xDEPBalance = xDEP.balanceOf(who);
-        if (xDEPBalance < sum) {
-            return xDEPBalance;
-        } else {
-            return sum;
-        }
+        return sum;
     }
     
     function donateHUSD(uint256 amount) public {
@@ -229,6 +240,8 @@ contract DAOPool {
     }
     
     function unlock(uint256 _amount) public {
+        require(unlockableAmount(msg.sender) >= _amount, "unlock over unlockableAmount");
+        
         _updateSharesAndRewardsInfo();
         _claim(msg.sender);
         
@@ -264,7 +277,7 @@ contract DAOPool {
         _claim(msg.sender);
 
         UnlockRequest[] storage reqs = userUnlockRequests[msg.sender];
-        uint256 amount = unlockableAmount(msg.sender);
+        uint256 amount = unstakableAmount(msg.sender);
         require(amount != 0, "no available dep");
         DEP.transfer(msg.sender, amount);
         for (uint256 iPlusOne = reqs.length; iPlusOne > 0; iPlusOne--) {
