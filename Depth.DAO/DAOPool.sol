@@ -87,8 +87,6 @@ contract DAOPool {
     
     uint256 public startTime;
     
-    address[] public addressSet;
-    
     uint256 public lockingLength;
     
     SharesAndRewardsInfo public sharesAndRewardsInfo;
@@ -123,13 +121,6 @@ contract DAOPool {
         require(xDEP.mint(msg.sender, reqs[index].amount), "stake mint failed");
         
         _deleteRequestAt(index);
-    }
-
-    function _addAddress(address add) private {
-        for (uint256 i = 0; i < addressSet.length; i++) {
-            if (addressSet[i] == add) return;
-        }
-        addressSet.push(add);
     }
     
     function _deleteRequestAt(uint256 index) private {
@@ -229,7 +220,6 @@ contract DAOPool {
         _claim(msg.sender);
         
         UserInfo storage user = userInfo[msg.sender];
-        _addAddress(msg.sender);
         require(DEP.transferFrom(msg.sender, address(this), _amount), "stake transferFrom failed");
         if (user.amount > 0) {
             user.amount = user.amount + _amount;
@@ -259,7 +249,6 @@ contract DAOPool {
         _claim(msg.sender);
 
         _relock(index);
-        
     }
     
     function relockAll() public {
