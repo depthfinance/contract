@@ -79,8 +79,7 @@ contract DAOPool {
     struct SharesAndRewardsInfo {
         uint256 activeShares;     
         uint256 pendingShares;
-        uint256 currentEpochRewards;     
-        uint256 previousEpochRewards;
+        uint256 rewards;
         uint256 lastUpdatedEpochFlag;
     }
     
@@ -105,10 +104,10 @@ contract DAOPool {
     MintableToken public xDEP;
     
     constructor(address xDEPAddress) {
-        epochLength = 1 minutes;
+        epochLength = 1 minutes; // 1 minutes for test, to do: update to seven days
         startTime = block.timestamp;
         xDEP = MintableToken(xDEPAddress);
-        lockingLength = 2 minutes;
+        lockingLength = 2 minutes; // 2 minutes for test, to do: update to seven days
     }
 
     function _isEven() view private returns (bool) {
@@ -120,9 +119,10 @@ contract DAOPool {
         UserInfo storage user = userInfo[msg.sender];
         UnlockRequest[] storage reqs = userUnlockRequests[msg.sender];
         user.amount = user.amount + reqs[index].amount;
-        _deleteRequestAt(index);
-        
         sharesAndRewardsInfo.activeShares = sharesAndRewardsInfo.activeShares + reqs[index].amount;
+        require(xDEP.mint(msg.sender, reqs[index].amount), "stake mint failed");
+        
+        _deleteRequestAt(index);
     }
 
     function _addAddress(address add) private {
@@ -144,7 +144,7 @@ contract DAOPool {
         UserInfo storage user = userInfo[_user];
         uint256 rewards = pendingReward(_user);
         if (rewards > 0) {
-            require(HUSD.transfer(_user, rewards), "HUSD.transfer(msg.sender, rewardAmount)");
+            require(HUSD.transfer(_user, rewards), "_claim transfer failed");
             user.lastRewardedEpoch = currentEpoch();
         }
     }
@@ -153,8 +153,7 @@ contract DAOPool {
         if (sharesAndRewardsInfo.lastUpdatedEpochFlag < currentEpoch()) {
             sharesAndRewardsInfo.activeShares = sharesAndRewardsInfo.pendingShares + sharesAndRewardsInfo.activeShares;
             sharesAndRewardsInfo.pendingShares = 0;
-            sharesAndRewardsInfo.previousEpochRewards = sharesAndRewardsInfo.currentEpochRewards + sharesAndRewardsInfo.previousEpochRewards;
-            sharesAndRewardsInfo.currentEpochRewards = 0;
+            sharesAndRewardsInfo.rewards = HUSD.balanceOf(address(this));
             sharesAndRewardsInfo.lastUpdatedEpochFlag = currentEpoch();
         }
     }
@@ -179,12 +178,12 @@ contract DAOPool {
         uint256 totalAmount = shareAmount();
         if (totalAmount != 0 && user.lastRewardedEpoch <= currentEpoch() - 1) {
             uint256 HUSDBalance = HUSD.balanceOf(address(this));
-            if (HUSDBalance < sharesAndRewardsInfo.previousEpochRewards) {
+            
+            if (HUSDBalance < sharesAndRewardsInfo.rewards) {
                 return SafeMath.div(SafeMath.mul(user.amount, HUSDBalance), totalAmount);
             } else {
-                return SafeMath.div(SafeMath.mul(user.amount, sharesAndRewardsInfo.previousEpochRewards), totalAmount);
+                return SafeMath.div(SafeMath.mul(user.amount, sharesAndRewardsInfo.rewards), totalAmount);
             }
-            
         } else {
             return 0;
         }
@@ -221,9 +220,7 @@ contract DAOPool {
     
     function donateHUSD(uint256 amount) public {
         _updateSharesAndRewardsInfo();
-        
-        require(HUSD.transferFrom(msg.sender, address(this), amount), "aaaa");
-        sharesAndRewardsInfo.currentEpochRewards = sharesAndRewardsInfo.currentEpochRewards + amount;
+        require(HUSD.transferFrom(msg.sender, address(this), amount), "donateHUSD transferFrom failed");
     }
     
     function stake(uint256 _amount) public {
@@ -233,14 +230,14 @@ contract DAOPool {
         
         UserInfo storage user = userInfo[msg.sender];
         _addAddress(msg.sender);
-        require(DEP.transferFrom(msg.sender, address(this), _amount), "bbbb");
+        require(DEP.transferFrom(msg.sender, address(this), _amount), "stake transferFrom failed");
         if (user.amount > 0) {
             user.amount = user.amount + _amount;
         } else {
             user.amount = _amount;
         }
         sharesAndRewardsInfo.pendingShares = sharesAndRewardsInfo.pendingShares + _amount;
-        require(xDEP.mint(msg.sender, _amount), "mint failed");
+        require(xDEP.mint(msg.sender, _amount), "stake mint failed");
     }
     
     function unlock(uint256 _amount) public {
@@ -254,6 +251,7 @@ contract DAOPool {
             amount: _amount,
             unlockTimestamp: block.timestamp
         }));
+        require(xDEP.burn(msg.sender, _amount), "unlock burn failed");
     }
     
     function relock(uint256 index) public {
@@ -261,6 +259,7 @@ contract DAOPool {
         _claim(msg.sender);
 
         _relock(index);
+        
     }
     
     function relockAll() public {
@@ -279,7 +278,7 @@ contract DAOPool {
 
         UnlockRequest[] storage reqs = userUnlockRequests[msg.sender];
         uint256 amount = unlockableAmount(msg.sender);
-        require(amount != 0, "No Available Dep");
+        require(amount != 0, "no available dep");
         DEP.transfer(msg.sender, amount);
         for (uint256 iPlusOne = reqs.length; iPlusOne > 0; iPlusOne--) {
             uint256 i = iPlusOne - 1;
@@ -287,7 +286,7 @@ contract DAOPool {
                 _deleteRequestAt(i);
             }
         }
-        require(xDEP.burn(msg.sender, amount), "burn failed");
+        require(xDEP.burn(msg.sender, amount), "unStake burn failed");
     }
 
     function claim(address _user) public {
