@@ -3,3 +3,6 @@ DAOPool receives HUSD from Filda, Channels, Lendhub-HUSD-USDT, Lenhub-ETH-BETH P
 
 ### handleXXX.sol
 handleXXX.sol converts platform token, admin fees to HUSD and sends HUSD to DAOPool.
+
+### xDep.sol
+Contract of xDep token.
