@@ -78,7 +78,8 @@ contract DAOPool {
     
     struct SharesAndRewardsInfo {
         uint256 activeShares;     
-        uint256 pendingShares;
+        uint256 pendingSharesToAdd;
+        uint256 pendingSharesToReduce;
         uint256 rewards;
         uint256 lastUpdatedEpochFlag;
     }
@@ -117,7 +118,7 @@ contract DAOPool {
         UserInfo storage user = userInfo[msg.sender];
         UnlockRequest[] storage reqs = userUnlockRequests[msg.sender];
         user.amount = user.amount + reqs[index].amount;
-        sharesAndRewardsInfo.activeShares = sharesAndRewardsInfo.activeShares + reqs[index].amount;
+        sharesAndRewardsInfo.pendingSharesToAdd = sharesAndRewardsInfo.pendingSharesToAdd + reqs[index].amount;
         require(xDEP.mint(msg.sender, reqs[index].amount), "stake mint failed");
         
         _deleteRequestAt(index);
@@ -142,8 +143,9 @@ contract DAOPool {
 
     function _updateSharesAndRewardsInfo() private {
         if (sharesAndRewardsInfo.lastUpdatedEpochFlag < currentEpoch()) {
-            sharesAndRewardsInfo.activeShares = sharesAndRewardsInfo.pendingShares + sharesAndRewardsInfo.activeShares;
-            sharesAndRewardsInfo.pendingShares = 0;
+            sharesAndRewardsInfo.activeShares = sharesAndRewardsInfo.activeShares + sharesAndRewardsInfo.pendingSharesToAdd - sharesAndRewardsInfo.pendingSharesToReduce;
+            sharesAndRewardsInfo.pendingSharesToAdd = 0;
+            sharesAndRewardsInfo.pendingSharesToReduce = 0;
             sharesAndRewardsInfo.rewards = HUSD.balanceOf(address(this));
             sharesAndRewardsInfo.lastUpdatedEpochFlag = currentEpoch();
         }
@@ -151,7 +153,7 @@ contract DAOPool {
 
     function shareAmount() public view returns(uint256) {
         if (sharesAndRewardsInfo.lastUpdatedEpochFlag < currentEpoch()) {
-            return sharesAndRewardsInfo.pendingShares + sharesAndRewardsInfo.activeShares;
+            return sharesAndRewardsInfo.activeShares + sharesAndRewardsInfo.pendingSharesToAdd - sharesAndRewardsInfo.pendingSharesToReduce;
         } else {
             return sharesAndRewardsInfo.activeShares;
         }
@@ -167,7 +169,7 @@ contract DAOPool {
         
         UserInfo storage user = userInfo[who];
         uint256 totalAmount = shareAmount();
-        if (totalAmount != 0 && user.lastRewardedEpoch <= currentEpoch() - 1) {
+        if (totalAmount != 0 && user.lastRewardedEpoch < currentEpoch()) {
             uint256 HUSDBalance = HUSD.balanceOf(address(this));
             
             if (HUSDBalance < sharesAndRewardsInfo.rewards) {
@@ -221,12 +223,8 @@ contract DAOPool {
         
         UserInfo storage user = userInfo[msg.sender];
         require(DEP.transferFrom(msg.sender, address(this), _amount), "stake transferFrom failed");
-        if (user.amount > 0) {
-            user.amount = user.amount + _amount;
-        } else {
-            user.amount = _amount;
-        }
-        sharesAndRewardsInfo.pendingShares = sharesAndRewardsInfo.pendingShares + _amount;
+        user.amount = user.amount + _amount;
+        sharesAndRewardsInfo.pendingSharesToAdd = sharesAndRewardsInfo.pendingSharesToAdd + _amount;
         require(xDEP.mint(msg.sender, _amount), "stake mint failed");
     }
     
@@ -234,7 +232,7 @@ contract DAOPool {
         _updateSharesAndRewardsInfo();
         _claim(msg.sender);
         
-        sharesAndRewardsInfo.activeShares = sharesAndRewardsInfo.activeShares - _amount;
+        sharesAndRewardsInfo.pendingSharesToReduce = sharesAndRewardsInfo.pendingSharesToReduce + _amount;
         UserInfo storage user = userInfo[msg.sender];
         user.amount = SafeMath.sub(user.amount, _amount);
         userUnlockRequests[msg.sender].push(UnlockRequest({
@@ -275,7 +273,6 @@ contract DAOPool {
                 _deleteRequestAt(i);
             }
         }
-        require(xDEP.burn(msg.sender, amount), "unStake burn failed");
     }
 
     function claim(address _user) public {
