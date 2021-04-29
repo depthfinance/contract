@@ -102,11 +102,11 @@ contract DAOPool {
     
     MintableToken public xDEP;
     
-    constructor(address xDEPAddress) {
-        epochLength = 1 minutes; // 1 minutes for test, to do: update to seven days
+    constructor(address xDEPAddress, uint256 _startTime) {
+        epochLength = 5 minutes; // 1 minutes for test, to do: update to seven days
         startTime = block.timestamp;
         xDEP = MintableToken(xDEPAddress);
-        lockingLength = 2 minutes; // 2 minutes for test, to do: update to seven days
+        lockingLength = 5 minutes; // 2 minutes for test, to do: update to seven days
     }
 
     function _relock(uint256 index) private {
@@ -181,11 +181,10 @@ contract DAOPool {
         uint256 totalAmount = shareAmount();
         if (totalAmount != 0 && user.lastRewardedEpoch < currentEpoch()) {
             uint256 HUSDBalance = HUSD.balanceOf(address(this));
-            if (HUSDBalance < rewardsAmount()) {
-                return SafeMath.div(SafeMath.mul(user.amount, HUSDBalance), totalAmount);
-            } else {
-                return SafeMath.div(SafeMath.mul(user.amount, rewardsAmount()), totalAmount);
-            }
+            uint256 myRewardsAmount = SafeMath.div(SafeMath.mul(user.amount, shareAmount()), totalAmount);
+            // If rewards is larger than HUSD Balance, then all HUSD will be the rewards.
+            // But it is unlikely HUSDBalance be less than myRewardsAmount.
+            return HUSDBalance < myRewardsAmount ? HUSDBalance : myRewardsAmount;
         } else {
             return 0;
         }
@@ -269,9 +268,10 @@ contract DAOPool {
         _claim(msg.sender);
 
         uint256 reqsN = userUnlockRequests[msg.sender].length;
-        for (uint256 i = 0; i < reqsN; i++) {
+        for (uint256 i = reqsN - 1; i > 0; i--) {
             _relock(i);
         }
+        _relock(0);
     }
 
     function unStake() public {
