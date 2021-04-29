@@ -181,7 +181,7 @@ contract DAOPool {
         uint256 totalAmount = shareAmount();
         if (totalAmount != 0 && user.lastRewardedEpoch < currentEpoch()) {
             uint256 HUSDBalance = HUSD.balanceOf(address(this));
-            uint256 myRewardsAmount = SafeMath.div(SafeMath.mul(user.amount, shareAmount()), totalAmount);
+            uint256 myRewardsAmount = SafeMath.div(SafeMath.mul(user.amount, rewardsAmount()), totalAmount);
             // If rewards is larger than HUSD Balance, then all HUSD will be the rewards.
             // But it is unlikely HUSDBalance be less than myRewardsAmount.
             return HUSDBalance < myRewardsAmount ? HUSDBalance : myRewardsAmount;
