@@ -19,6 +19,7 @@ contract OtcStorage is  Ownable {
   bool isPaused;
   mapping (address=>bool) otcContracts;//ony in this list can call saveMoney function  
 
+
   uint256 public totalTradeAmount;//total trade amount by husd
   uint256 public totalFeeAmount;//total fee amount by husd;
   uint256 public totalAvailableFeeAmount;//total available fee amount by husd;
@@ -98,6 +99,7 @@ contract OtcStorage is  Ownable {
       
       //get balance of lp token
       uint256 balance = IERC20(_lpToken).balanceOf(address(this));
+      IERC20(_lpToken).approve(depthStakeAddress,balance);
       //start to stake 
       require(balance>0,"invalid lp token balance");
       stakeContract(depthStakeAddress).stake(depthStakePoolId,balance) ;
@@ -150,6 +152,7 @@ contract OtcStorage is  Ownable {
             
         }
     }
+    
     //set white tokne pair.can mine depth
     function setWhitePairs(uint256 _index,address _token1,address  _token2) external onlyOwner{
       // Ensure the fee is less than divisor
@@ -227,10 +230,10 @@ contract OtcStorage is  Ownable {
         uint256 _timeKey = 0;
         uint256 _todayTimeKey =block.timestamp/86400*86400;
         
-        if (_todayTimeKey>lastRewardTimeKey&&poolTimeKeyInfo[lastRewardTimeKey].flag&&poolTimeKeyInfo[lastRewardTimeKey].rewardTokenAmount==0){
+        if (_todayTimeKey>=lastRewardTimeKey&&poolTimeKeyInfo[lastRewardTimeKey].flag&&poolTimeKeyInfo[lastRewardTimeKey].rewardTokenAmount==0){
             return lastRewardTimeKey;
         }
-        if (_todayTimeKey>currentTimeKey&&poolTimeKeyInfo[currentTimeKey].flag&&poolTimeKeyInfo[currentTimeKey].rewardTokenAmount==0){
+        if (_todayTimeKey>=currentTimeKey&&poolTimeKeyInfo[currentTimeKey].flag&&poolTimeKeyInfo[currentTimeKey].rewardTokenAmount==0){
             return currentTimeKey;
         }
         return _timeKey;
@@ -270,7 +273,7 @@ contract OtcStorage is  Ownable {
                 uint256 _poolTokenAmount = poolTimeKeyInfo[_timeKey].rewardTokenAmount;
                 
               
-                _tokenAmount = _tokenAmount.add(userNoClaimedTimeKeyInfo[_address][_timeKey].availableFeeAmount.div(poolTimeKeyInfo[_timeKey].availableFeeAmount).mul(_poolTokenAmount));
+                _tokenAmount = _tokenAmount.add(userNoClaimedTimeKeyInfo[_address][_timeKey].availableFeeAmount.mul(_poolTokenAmount).div(poolTimeKeyInfo[_timeKey].availableFeeAmount));
             }
             
         }
@@ -286,7 +289,7 @@ contract OtcStorage is  Ownable {
             if (_poolTokenAmount==0){//not reward from depth stake contract.get the balance 
                 _poolTokenAmount = stakeContract(depthStakeAddress).pendingPiggy(depthStakePoolId,address(this));
             }
-            _tokenAmount = userNoClaimedTimeKeyInfo[_address][_timeKey].availableFeeAmount.div(poolTimeKeyInfo[_timeKey].availableFeeAmount).mul(_poolTokenAmount);
+            _tokenAmount = userNoClaimedTimeKeyInfo[_address][_timeKey].availableFeeAmount.mul(_poolTokenAmount).div(poolTimeKeyInfo[_timeKey].availableFeeAmount);
         }
             
         
@@ -313,6 +316,7 @@ contract OtcStorage is  Ownable {
         
         uint256[] memory userTimeKeys=userNoClaimedTimes[msg.sender];
         delete userNoClaimedTimes[msg.sender];
+        uint256 _depAmount =0;
         for(uint i=0;i<userTimeKeys.length;i++){
             uint256 _timeKey = userTimeKeys[i];
             PoolTimeKeyInfo storage _poolInfo=poolTimeKeyInfo[_timeKey];
@@ -320,28 +324,31 @@ contract OtcStorage is  Ownable {
             uint256 _poolTokenAmount = _poolInfo.rewardTokenAmount;
             if(_poolTokenAmount>0&&poolTimeKeyInfo[_timeKey].availableFeeAmount>0){
                 //this pool has reward depth token.can claim.
-                uint256 _tokenAmount = _userInfo.availableFeeAmount.div(poolTimeKeyInfo[_timeKey].availableFeeAmount).mul(_poolTokenAmount);
+                uint256 _tokenAmount = _userInfo.availableFeeAmount.mul(_poolTokenAmount).div(poolTimeKeyInfo[_timeKey].availableFeeAmount);
+                _depAmount=_depAmount.add(_tokenAmount);
                 totalClaimedTokenAmount = totalClaimedTokenAmount.add(_tokenAmount);
-                _poolInfo.claimedTokenAmount = _poolInfo.claimedTokenAmount+_tokenAmount;
-                _poolInfo.claimedAvailbleFeeAmount = _poolInfo.claimedAvailbleFeeAmount+_userInfo.availableFeeAmount;
-                if ( _poolInfo.claimedAvailbleFeeAmount ==_poolInfo.availableFeeAmount){
+                _poolInfo.claimedTokenAmount = _poolInfo.claimedTokenAmount.add(_tokenAmount);
+                _poolInfo.claimedAvailbleFeeAmount = _poolInfo.claimedAvailbleFeeAmount.add(_userInfo.availableFeeAmount);
+                if ( _poolInfo.claimedAvailbleFeeAmount >=_poolInfo.availableFeeAmount){
                     //all users have claimed depth token
                     delete poolTimeKeyInfo[_timeKey];
                 }
+                delete userNoClaimedTimeKeyInfo[msg.sender][_timeKey];
             }else{
                 userNoClaimedTimes[msg.sender].push(_timeKey);
             }
-              
-            
-            
         }
+        if (_depAmount>0){
+            IERC20(depTokenAddress).safeTransfer(msg.sender,_depAmount);
+        }
+        
         
        
         
     }
     
     //return global trade datas
-    function getTradeDatas() external view returns(uint256 totalTradeAmount,uint256 totalFeeAmount,uint256 totalAvailableFeeAmount,uint256 totalRewardTokenAmount,uint256 totalClaimedTokenAmount){
+    function getTradeDatas() external view returns(uint256,uint256,uint256,uint256,uint256){
         return (totalTradeAmount,totalFeeAmount,totalAvailableFeeAmount,totalRewardTokenAmount,totalClaimedTokenAmount);
         
     }
