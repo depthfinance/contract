@@ -153,22 +153,28 @@ contract OtcStorage is  Ownable {
         }
     }
     
-    //set white tokne pair.can mine depth
-    function setWhitePairs(uint256 _index,address _token1,address  _token2) external onlyOwner{
+    //add white tokne pair.can mine depth
+    function addWhitePairs(uint256 _index,address _token1,address  _token2) external onlyOwner{
       // Ensure the fee is less than divisor
         require(_token1!=address(0)&&_token2!=address(0)&&_token1!=_token2, "INVALID_ADDRESS");
         uint256 len = whitePairList.length;
         require(_index <= len, "INVALID_INDEX");
-  
+
         if (len==0||_index==len){
-      
+
             whitePairList.push([_token1,_token2]);
         }else{
             whitePairList[_index] = [_token1,_token2];
         }
-        
-        
+
+
      }
+    //remove white tokne pair.can mine depth
+    function removeWhitePairs(uint256 _index) external onlyOwner{
+
+        delete  whitePairList[_index];
+
+    }
      function isWhitePair(address _token1,address _token2) public view returns(bool){
          for(uint i = 0; i < whitePairList.length; i++) {
              if ((whitePairList[i][0]==_token1&&whitePairList[i][1]==_token2)||(whitePairList[i][0]==_token2&&whitePairList[i][1]==_token1)){
