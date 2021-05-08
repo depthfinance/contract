@@ -81,6 +81,7 @@ contract DAOPool {
         uint256 pendingSharesToAdd;
         uint256 pendingSharesToReduce;
         uint256 rewards;
+        uint256 claimedRewards;
         uint256 lastUpdatedEpochFlag;
     }
     
@@ -103,10 +104,10 @@ contract DAOPool {
     MintableToken public xDEP;
     
     constructor(address xDEPAddress, uint256 _startTime) {
-        epochLength = 5 minutes; // 1 minutes for test, to do: update to seven days
-        startTime = block.timestamp;
+        epochLength = 7 days; 
+        startTime = _startTime;
         xDEP = MintableToken(xDEPAddress);
-        lockingLength = 5 minutes; // 2 minutes for test, to do: update to seven days
+        lockingLength = 7 days; 
     }
 
     function _relock(uint256 index) private {
@@ -131,9 +132,10 @@ contract DAOPool {
         UserInfo storage user = userInfo[_user];
         uint256 rewards = pendingReward(_user);
         if (rewards > 0) {
+            sharesAndRewardsInfo.claimedRewards = SafeMath.add(sharesAndRewardsInfo.claimedRewards, rewards);
             require(HUSD.transfer(_user, rewards), "_claim transfer failed");
-            user.lastRewardedEpoch = currentEpoch();
         }
+        user.lastRewardedEpoch = currentEpoch();
     }
 
     function _updateSharesAndRewardsInfo() private {
@@ -147,6 +149,7 @@ contract DAOPool {
             sharesAndRewardsInfo.pendingSharesToReduce = 0;
             sharesAndRewardsInfo.rewards = HUSD.balanceOf(address(this));
             sharesAndRewardsInfo.lastUpdatedEpochFlag = currentEpoch();
+            sharesAndRewardsInfo.claimedRewards = 0;
         }
     }
 
@@ -170,6 +173,7 @@ contract DAOPool {
     }
     
     function currentEpoch() public view returns(uint256) {
+        if (block.timestamp < startTime) return 0;
         uint256 period = SafeMath.sub(block.timestamp, startTime);
         return SafeMath.div(period, epochLength);
     }
@@ -221,6 +225,14 @@ contract DAOPool {
             }
         }
         return sum;
+    }
+    
+    function claimedRewards() public view returns (uint256) {
+        if (sharesAndRewardsInfo.lastUpdatedEpochFlag < currentEpoch()) {
+            return 0;
+        } else {
+            return sharesAndRewardsInfo.claimedRewards;
+        }
     }
     
     function donateHUSD(uint256 amount) public {
