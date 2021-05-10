@@ -21,7 +21,7 @@ contract DepthOtcV1 is IOtcV1, Ownable {
   }
   bool public isPaused;
   FeeInfo[] public feeInfo;
- 
+
 
   bytes32 public constant DOMAIN_TYPEHASH =
     keccak256(
@@ -58,11 +58,11 @@ contract DepthOtcV1 is IOtcV1, Ownable {
 
   uint256 public constant FEE_DIVISOR = 100000;
   uint256 public stakeTokenDecimal = 10**18;
-  
+
   address public husd ;
   address public usdt ;
-  
- 
+  address public wht = 0x5545153CCFcA01fbd7Dd11C0b23ba694D9509A6F;
+
   mapping(address => mapping(uint256 => uint256)) internal _nonceGroups;
 
   mapping(address => address) public override authorized;
@@ -99,8 +99,8 @@ contract DepthOtcV1 is IOtcV1, Ownable {
     husdSwapAddress = _husdSwapAddress;
     daoAddress = _daoAddress;
   }
-    
-  
+
+
 
   /**
    * @notice Atomic Token Swap with Recipient
@@ -160,13 +160,13 @@ contract DepthOtcV1 is IOtcV1, Ownable {
     if (makerAddress != signatory) {
       require(authorized[makerAddress] == signatory, "UNAUTHORIZED");
     }
-    
+
     // Transfer token from taker to maker
     takerToken.safeTransferFrom(msg.sender, makerAddress, takerAmount);
     //transfer token from maker to contract.
     makerToken.safeTransferFrom(makerAddress,address(this), makerAmount);
     uint256 _feeAmount=_dealFee(makerAddress,makerToken,makerAmount,takerToken);
-    
+
 
     // Emit a Swap event
     emit Swap(
@@ -181,12 +181,45 @@ contract DepthOtcV1 is IOtcV1, Ownable {
       _feeAmount
     );
   }
+
+  function swapOtherTokensToHusd(IERC20 token,uint256 amount) internal{
+//swap other token to husd
+      HusdSwapRouter swap = HusdSwapRouter(husdSwapAddress);
+      address[] memory path1 = new address[](2);
+      path1[0] = address(token);
+      path1[1] = husd;
+      uint256 amount1 = swap.getAmountsOut(amount, path1);
+
+      address[] memory path2 = new address[](3);
+      path2[0] = address(token);
+      path2[1] = wht;
+      path2[2] = husd;
+      uint256 amount2 = swap.getAmountsOut(amount, path2);
+
+      address[] memory path3 = new address[](3);
+      path3[0] = address(token);
+      path3[1] = usdt;
+      path3[2] = husd;
+      uint256 amount3 = swap.getAmountsOut(amount, path3);
+
+      address[] memory path;
+      if (amount1 >= amount2 && amount1 >= amount3) {
+      path = path1;
+      } else if (amount2 >= amount1 && amount2 >= amount3) {
+      path = path2;
+      } else {
+      path = path3;
+      }
+
+      token.approve(address(husdSwapAddress), amount);
+      try swap.swapExactTokensForTokens(amount, 0, path, address(this), block.timestamp){}catch{}
+  }
   //deal fee and return taker amount fee
   function _dealFee(address makerAddress,IERC20 makerToken,uint256 makerAmount,IERC20 takerToken) internal returns(uint256){
        //cal taker fee rate
     uint256 _feeRate =getFeeRate(msg.sender);
     uint256 _feeAmount = _feeRate.mul(makerAmount).div(FEE_DIVISOR);
-    
+
     // // Transfer left token from maker to taker
     makerToken.safeTransfer( msg.sender, makerAmount.sub(_feeAmount));
     //cal husd fee
@@ -202,20 +235,14 @@ contract DepthOtcV1 is IOtcV1, Ownable {
             //swap usdt to husd
             IERC20(usdt).approve(usdtSwapAddress,_feeAmount);
             try UsdtSwapRouter(usdtSwapAddress).exchange_underlying(1,0,_feeAmount,0){}catch{}
-         
+
         }else{
-            //swap other token to husd
-            address[] memory path = new address[](2);
-            path[0] = address(makerToken);
-            path[1] = husd;
-    
-            makerToken.approve(address(husdSwapAddress), _feeAmount);
-            try HusdSwapRouter(husdSwapAddress).swapExactTokensForTokens(_feeAmount, 0, path, address(this), block.timestamp){}catch{}
-            
+            swapOtherTokensToHusd(makerToken,_feeAmount);
+
         }
         //husd fee = current husd balance - before
         husdFee = IERC20(husd).balanceOf(address(this)).sub(_beforeBalance);
-        
+
     }
     //call storage contract to save data and send husd fee to dao
     if (husdFee>0){
@@ -227,20 +254,20 @@ contract DepthOtcV1 is IOtcV1, Ownable {
         IDao(daoAddress).donateHUSD(husdFee);
     }
     return _feeAmount;
-    
+
   }
 
 
-// set contract paused or not    
+// set contract paused or not
   function setPaused(bool b)   external onlyOwner{
       isPaused = b ;
   }
-  
+
   // set stake token address
   function setXdepAddress(address _address)   external onlyOwner{
       xdepAddress = _address;
   }
-  
+
   // set storage contract address
   function setStorageContractAddress(address _address)   external onlyOwner{
       storageContractAddress = _address;
@@ -263,19 +290,19 @@ contract DepthOtcV1 is IOtcV1, Ownable {
     require(rate < FEE_DIVISOR, "INVALID_FEE");
     uint256 len = feeInfo.length;
     require(index <= len, "INVALID_INDEX");
-    
+
     FeeInfo memory _new = FeeInfo({
         stakeAmount : stakeAmount,
         feeRate : rate
     });
     if (len==0||index==len){
-  
+
         feeInfo.push(_new);
     }else{
         feeInfo[index] = _new;
     }
-    
-    
+
+
   }
   //claim token fee
   //if token can not convert to husd.the fee will stay at contract address.and owner can claim them.
@@ -285,7 +312,7 @@ contract DepthOtcV1 is IOtcV1, Ownable {
           token.safeTransfer(msg.sender, balance);
       }
   }
-  
+
   //return address swap fee
   function getFeeRate(address _address) public view returns (uint256){
       require(_address != address(0), "INVALID_ADDRESS");
@@ -446,7 +473,7 @@ contract DepthOtcV1 is IOtcV1, Ownable {
     require(signatory != address(0), "INVALID_SIG");
     return signatory;
   }
-  
+
   function addBlackToken(address _address) external onlyOwner {
     blackTokens[_address] = true;
   }
@@ -456,5 +483,5 @@ contract DepthOtcV1 is IOtcV1, Ownable {
         delete blackTokens[_address];
     }
   }
- 
+
 }
