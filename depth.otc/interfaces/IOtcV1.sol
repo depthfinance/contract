@@ -50,6 +50,7 @@ interface UsdtSwapRouter {
     function exchange_underlying(int128, int128, uint256, uint256) external;
 }
 interface HusdSwapRouter {
+    function getAmountsOut(uint amountIn, address[] calldata path) external returns (uint256);
     function swapExactTokensForTokens(uint amountIn, uint amountOutMin, address[] calldata path, address to, uint deadline) external returns (uint[] memory amounts);
 }
 interface IStorage {
