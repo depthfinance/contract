@@ -15,15 +15,15 @@ import "./interfaces/IDepth.sol";
 contract OtcStorage is  Ownable {
   using SafeERC20 for IERC20;
   using SafeMath for uint256;
-  
+
   bool isPaused;
-  mapping (address=>bool) otcContracts;//ony in this list can call saveMoney function  
+  mapping (address=>bool) otcContracts;//ony in this list can call saveMoney function
 
 
   uint256 public totalTradeAmount;//total trade amount by husd
   uint256 public totalFeeAmount;//total fee amount by husd;
   uint256 public totalAvailableFeeAmount;//total available fee amount by husd;
-  uint256 public totalRewardTokenAmount;//total dep amount 
+  uint256 public totalRewardTokenAmount;//total dep amount
   uint256 public totalClaimedTokenAmount; //total claimed dep amount by users;
   uint256 public lastRewardTimeKey;//recent time key to reward depth.if reward action has done.will update this value to currentTimeKey;
   uint256 public currentTimeKey;//current time key to record trading amount info
@@ -34,17 +34,17 @@ contract OtcStorage is  Ownable {
   struct PoolTimeKeyInfo{
       uint256 tradeAmount;
       uint256 feeAmount;
-      uint256 availableFeeAmount; 
+      uint256 availableFeeAmount;
       uint256 rewardTokenAmount; //has reward depth token
       uint256 claimedTokenAmount; //has claimed depth token
-      uint256 claimedAvailbleFeeAmount;//if claimedAvailbleFeeAmount==availableFeeAmount .all users has claimed rewards 
+      uint256 claimedAvailbleFeeAmount;//if claimedAvailbleFeeAmount==availableFeeAmount .all users has claimed rewards
       bool flag ;//check the pool is existed;
-      
+
   }
   struct UserTimeKeyInfo{
       uint256 availableTradeAmount;
       uint256 availableFeeAmount;
-      
+
   }
 
   mapping (uint256=>PoolTimeKeyInfo) public poolTimeKeyInfo; //pool info storaged by timekey
@@ -54,8 +54,8 @@ contract OtcStorage is  Ownable {
   uint256 public depthStakePoolId;
   address public daoAddress;
   address public depTokenAddress;
-  
-  
+
+
   constructor(uint256 _timeKey,address _depthStakeAddress,uint256 _depthStakePoolId,address _daoAddress,address _depTokenAddress) public {
     if (_timeKey==0){
         lastRewardTimeKey = getTimeKey();
@@ -67,7 +67,7 @@ contract OtcStorage is  Ownable {
     daoAddress = _daoAddress;
     depTokenAddress=_depTokenAddress;
   }
-    
+
   //get time key by current time
   function getTimeKey() internal view returns(uint256){
       uint256 _timeKey =block.timestamp/86400*86400+86400;
@@ -78,9 +78,9 @@ contract OtcStorage is  Ownable {
           return _timeKey;
       }
   }
-  
 
-// set contract paused or not    
+
+// set contract paused or not
   function setPaused(bool b)   external onlyOwner{
       isPaused = b ;
   }
@@ -94,13 +94,13 @@ contract OtcStorage is  Ownable {
        depthStakeAddress=_address;
        stakeContract _stake= stakeContract(depthStakeAddress);
       //get depth stake pool info
-      (address _lpToken,uint256 _allocPoint,uint256 _lastRewardBlock,uint256 _accPiggyPerShare,uint256 _totalDeposit,address _migrator) =_stake.poolInfo(depthStakePoolId);
+      (address _lpToken,,,,,) =_stake.poolInfo(depthStakePoolId);
       require(_lpToken!=address(0),"invalid lp token address");
-      
+
       //get balance of lp token
       uint256 balance = IERC20(_lpToken).balanceOf(address(this));
       IERC20(_lpToken).approve(depthStakeAddress,balance);
-      //start to stake 
+      //start to stake
       require(balance>0,"invalid lp token balance");
       stakeContract(depthStakeAddress).stake(depthStakePoolId,balance) ;
   }
@@ -117,9 +117,9 @@ contract OtcStorage is  Ownable {
       }
   }
 
-  
 
-  
+
+
   function addOtcContract(address _address) external onlyOwner {
     otcContracts[_address] = true;
   }
@@ -129,7 +129,7 @@ contract OtcStorage is  Ownable {
         delete otcContracts[_address];
     }
   }
-    
+
 //set firstTokenAllocTimeKey
   function setLastTokenRewardTimeKey(uint256 _time) external onlyOwner{
     //if has totalTradeAmount.can not set firstTokenAllocTimeKey
@@ -139,20 +139,20 @@ contract OtcStorage is  Ownable {
     }else{
         lastRewardTimeKey = _time;
     }
-  } 
+  }
 
- 
-    
+
+
     //delete has claimed all depth pool by time key.must next has allocated depth token.
     function deletePool(uint256 timeKey)   external onlyOwner{
         PoolTimeKeyInfo memory _poolInfo = poolTimeKeyInfo[timeKey];
         if (_poolInfo.availableFeeAmount>0&&_poolInfo.availableFeeAmount==_poolInfo.claimedAvailbleFeeAmount){
-            
+
             delete poolTimeKeyInfo[timeKey];
-            
+
         }
     }
-    
+
     //add white tokne pair.can mine depth
     function addWhitePairs(uint256 _index,address _token1,address  _token2) external onlyOwner{
       // Ensure the fee is less than divisor
@@ -188,7 +188,7 @@ contract OtcStorage is  Ownable {
         require(!isPaused,"paused");
         //check the caller in otc contracts
         require(otcContracts[msg.sender],"invalid otc contract address");
-        
+
         if(_amount<=0){
             return;
         }
@@ -197,7 +197,7 @@ contract OtcStorage is  Ownable {
         //check tokens are in white list
         uint256 availableFee = 0;
         uint256 _timeKey = getTimeKey();
-    
+
         if(isWhitePair(_makeToken,_takeToken)){
             availableFee = _fee;
         }
@@ -209,19 +209,19 @@ contract OtcStorage is  Ownable {
                 poolTimeKeyInfo[_timeKey].flag=true;
                 currentTimeKey = _timeKey;
             }
-            
-                
+
+
             poolTimeKeyInfo[_timeKey].tradeAmount=poolTimeKeyInfo[_timeKey].tradeAmount.add(_amount);
             poolTimeKeyInfo[_timeKey].feeAmount= poolTimeKeyInfo[_timeKey].feeAmount.add(_fee);
             poolTimeKeyInfo[_timeKey].availableFeeAmount=poolTimeKeyInfo[_timeKey].availableFeeAmount.add(availableFee);
             //above to set pool info
             //begin to set address time info
-            
+
             saveAddressFeeAmount(_timeKey,_maker,_amount.div(2),availableFee.div(2));
             saveAddressFeeAmount(_timeKey,_taker,_amount.sub(_amount.div(2)),availableFee.sub(availableFee.div(2)));
-            
+
         }
-        
+
     }
     //internal function to save address amount and fee.
     function saveAddressFeeAmount(uint256 _timeKey,address _address,uint256 _amount,uint256 _fee) internal{
@@ -231,11 +231,11 @@ contract OtcStorage is  Ownable {
         userNoClaimedTimeKeyInfo[_address][_timeKey].availableTradeAmount =userNoClaimedTimeKeyInfo[_address][_timeKey].availableTradeAmount.add(_amount);
         userNoClaimedTimeKeyInfo[_address][_timeKey].availableFeeAmount =userNoClaimedTimeKeyInfo[_address][_timeKey].availableFeeAmount.add(_fee);
     }
-     
+
     function getRewardTimeKey() public view returns(uint256){
         uint256 _timeKey = 0;
         uint256 _todayTimeKey =block.timestamp/86400*86400;
-        
+
         if (_todayTimeKey>=lastRewardTimeKey&&poolTimeKeyInfo[lastRewardTimeKey].flag&&poolTimeKeyInfo[lastRewardTimeKey].rewardTokenAmount==0){
             return lastRewardTimeKey;
         }
@@ -243,8 +243,8 @@ contract OtcStorage is  Ownable {
             return currentTimeKey;
         }
         return _timeKey;
-            
-        
+
+
     }
     //claim depth token and reward to pool.every adress can call this function
     function rewardToken() external{
@@ -257,69 +257,69 @@ contract OtcStorage is  Ownable {
         //first call stake contract claim depth token to this contract.
         stakeContract(depthStakeAddress).claim(depthStakePoolId);
         uint256 _rewardAmount = IERC20(depTokenAddress).balanceOf(address(this)).sub(_before);
-        
+
         totalRewardTokenAmount = totalRewardTokenAmount.add(_rewardAmount);
         poolTimeKeyInfo[_timeKey].rewardTokenAmount = _rewardAmount;
-        
+
         lastRewardTimeKey = currentTimeKey;
-        
+
     }
-    
+
     //calculate address can claim dep tokens .
     function canClaim(address _address) public view returns(uint256){
         uint256[] memory noClaimTimes = userNoClaimedTimes[_address];
         uint256 _tokenAmount=0;
         uint256 _currentTimeKey= getTimeKey();
         for (uint i=0;i<noClaimTimes.length;i++){
-        
+
             uint256 _timeKey=noClaimTimes[i];
-            
-            
+
+
             if(_timeKey<_currentTimeKey&&poolTimeKeyInfo[_timeKey].availableFeeAmount>0){
                 uint256 _poolTokenAmount = poolTimeKeyInfo[_timeKey].rewardTokenAmount;
-                
-              
+
+
                 _tokenAmount = _tokenAmount.add(userNoClaimedTimeKeyInfo[_address][_timeKey].availableFeeAmount.mul(_poolTokenAmount).div(poolTimeKeyInfo[_timeKey].availableFeeAmount));
             }
-            
+
         }
         return _tokenAmount;
     }
-    
+
     function nextCanClaim(address _address) public view returns(uint256){
-      
+
         uint256 _tokenAmount=0;
         uint256 _timeKey=getTimeKey();
         if(poolTimeKeyInfo[_timeKey].availableFeeAmount>0){
             uint256 _poolTokenAmount = poolTimeKeyInfo[_timeKey].rewardTokenAmount;
-            if (_poolTokenAmount==0){//not reward from depth stake contract.get the balance 
+            if (_poolTokenAmount==0){//not reward from depth stake contract.get the balance
                 _poolTokenAmount = stakeContract(depthStakeAddress).pendingPiggy(depthStakePoolId,address(this));
             }
             _tokenAmount = userNoClaimedTimeKeyInfo[_address][_timeKey].availableFeeAmount.mul(_poolTokenAmount).div(poolTimeKeyInfo[_timeKey].availableFeeAmount);
         }
-            
-        
+
+
         return _tokenAmount;
     }
-    //unstake lp token 
+    //unstake lp token
     function unStake() external onlyOwner{
         //first must claim.
         claim();
        stakeContract _stake= stakeContract(depthStakeAddress);
-      (uint256 amount,uint256 rewardDebt,uint256 pendingReward,bool unStakeBeforeEnableClaim)=_stake.userInfo(depthStakePoolId,address(this));
+      (uint256 amount,,,)=_stake.userInfo(depthStakePoolId,address(this));
       if (amount>0){
           _stake.unStake(depthStakePoolId,amount);
       }
-      
-        
+
+
     }
     //user claim depth token .
     function claim() public{
         require(!isPaused,"paused");
-        
 
-        uint256 _totalClaimAmount=0;
-        
+
+
+
         uint256[] memory userTimeKeys=userNoClaimedTimes[msg.sender];
         delete userNoClaimedTimes[msg.sender];
         uint256 _depAmount =0;
@@ -347,19 +347,19 @@ contract OtcStorage is  Ownable {
         if (_depAmount>0){
             IERC20(depTokenAddress).safeTransfer(msg.sender,_depAmount);
         }
-        
-        
-       
-        
+
+
+
+
     }
-    
+
     //return global trade datas
     function getTradeDatas() external view returns(uint256,uint256,uint256,uint256,uint256){
         return (totalTradeAmount,totalFeeAmount,totalAvailableFeeAmount,totalRewardTokenAmount,totalClaimedTokenAmount);
-        
+
     }
-    
-    
-    
-  
+
+
+
+
 }
