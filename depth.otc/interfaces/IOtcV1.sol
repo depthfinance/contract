@@ -59,3 +59,6 @@ interface IStorage {
 interface IDao {
      function donateHUSD(uint256 amount) external;
 }
+interface ISwapMining{
+  function takerWithdraw() external;
+}
