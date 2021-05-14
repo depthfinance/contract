@@ -188,19 +188,19 @@ contract DepthOtcV1 is IOtcV1, Ownable {
       address[] memory path1 = new address[](2);
       path1[0] = address(token);
       path1[1] = husd;
-      uint256 amount1 = swap.getAmountsOut(amount, path1);
+      uint256 amount1 = swap.getAmountsOut(amount, path1)[1];
 
       address[] memory path2 = new address[](3);
       path2[0] = address(token);
       path2[1] = wht;
       path2[2] = husd;
-      uint256 amount2 = swap.getAmountsOut(amount, path2);
+      uint256 amount2 = swap.getAmountsOut(amount, path2)[2];
 
       address[] memory path3 = new address[](3);
       path3[0] = address(token);
       path3[1] = usdt;
       path3[2] = husd;
-      uint256 amount3 = swap.getAmountsOut(amount, path3);
+      uint256 amount3 = swap.getAmountsOut(amount, path3)[2];
 
       address[] memory path;
       if (amount1 >= amount2 && amount1 >= amount3) {
