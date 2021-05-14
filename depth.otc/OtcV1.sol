@@ -484,4 +484,11 @@ contract DepthOtcV1 is IOtcV1, Ownable {
     }
   }
 
+
+    //claim exchange token like mdx to contract address.then can use claimFee to withdraw tokens to owner.
+    function claimExchangeMiningToken(address _address) external{
+        ISwapMining(_address).takerWithdraw();
+
+    }
+
 }
