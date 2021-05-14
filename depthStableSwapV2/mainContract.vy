@@ -30,6 +30,8 @@ interface cERC20:
     # def supplyRatePerBlock() -> uint256: constant
     # def accrualBlockNumber() -> uint256: constant
 
+# interface Curve:
+#     def exchange(i: int128, j: int128, dx: uint256, min_dy: uint256):
 
 # Events
 event TokenExchange:
@@ -836,33 +838,36 @@ def revert_transfer_ownership():
 
     self.transfer_ownership_deadline = 0
 
-
 @view
 @external
-def admin_balances(i: uint256) -> uint256:
-    return cERC20(self.c_tokens[i]).balanceOf(self) * cERC20(self.c_tokens[i]).exchangeRateStored() / PRECISION - self.balances[i]
+def admin_balances() -> uint256:
+    dx: uint256 = cERC20(self.c_tokens[1]).balanceOf(self) * cERC20(self.c_tokens[1]).exchangeRateStored() / PRECISION - self.balances[1]
+    xp: uint256[N_COINS] = self._xp()
+    precisions: uint256[N_COINS] = PRECISION_MUL
+
+    x: uint256 = xp[1] + dx * precisions[1]
+    y: uint256 = self.get_y(1, 0, x, xp)
+    dy: uint256 = (xp[0] - y - 1) / precisions[0]
+    return cERC20(self.c_tokens[0]).balanceOf(self) * cERC20(self.c_tokens[0]).exchangeRateStored() / PRECISION - self.balances[0] + dy
 
 @external
 def withdraw_admin_fees():
     assert msg.sender == self.owner  # dev: only owner
 
-    for i in range(N_COINS):
-        value: uint256 = cERC20(self.c_tokens[i]).balanceOf(self) * cERC20(self.c_tokens[i]).exchangeRateStored() / PRECISION - self.balances[i]
-        cERC20(self.c_tokens[i]).redeemUnderlying(value)
-        if value > 0:
-            # "safeTransfer" which works for ERC20s which return bool or not
-            _response: Bytes[32] = raw_call(
-                self.coins[i],
-                concat(
-                    method_id("transfer(address,uint256)"),
-                    convert(msg.sender, bytes32),
-                    convert(value, bytes32),
-                ),
-                max_outsize=32,
-            )  # dev: failed transfer
-            if len(_response) > 0:
-                assert convert(_response, bool)  # dev: failed transfer
-
+    # calculation
+    dx: uint256 = cERC20(self.c_tokens[1]).balanceOf(self) * cERC20(self.c_tokens[1]).exchangeRateStored() / PRECISION - self.balances[1]
+    rates: uint256[N_COINS] = RATES
+    xp: uint256[N_COINS] = self._xp()
+    x: uint256 = xp[1] + (dx * rates[1] / PRECISION)
+    y: uint256 = self.get_y(1, 0, x, xp)
+    dy: uint256 = (xp[0] - y - 1) * PRECISION / rates[0]
+    
+    # write
+    self.balances[0] -= dy
+    self.balances[1] -= dx
+    redeem_amount: uint256 = cERC20(self.c_tokens[0]).balanceOf(self) * cERC20(self.c_tokens[0]).exchangeRateStored() / PRECISION - self.balances[0] + dy
+    cERC20(self.c_tokens[0]).redeemUnderlying(redeem_amount)
+    ERC20(self.coins[0]).transfer(msg.sender, redeem_amount)
 
 @external
 def donate_admin_fees():
