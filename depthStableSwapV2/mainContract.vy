@@ -323,7 +323,7 @@ def add_liquidity(amounts: uint256[N_COINS], min_mint_amount: uint256):
             ERC20(self.coins[i]).approve(self.c_tokens[i], amounts[i])
             ok:uint256 = cERC20(self.c_tokens[i]).mint(amounts[i])
             if ok > 0:
-                raise "Could not redeem coin"
+                raise "Could not mint coin"
 
         new_balances[i] = old_balances[i] + in_amount
 
@@ -470,6 +470,12 @@ def exchange(i: int128, j: int128, dx: uint256, min_dy: uint256):
     if len(_response) > 0:
         assert convert(_response, bool)  # dev: failed transfer
 
+    # mint cToken
+    ERC20(self.coins[i]).approve(self.c_tokens[i], dx)
+    ok: uint256 = cERC20(self.c_tokens[i]).mint(dx)
+    if ok > 0:
+        raise "Could not mint coin"
+
     # if i == FEE_INDEX:
     #     dx_w_fee = ERC20(input_coin).balanceOf(self) - dx_w_fee
 
@@ -491,7 +497,7 @@ def exchange(i: int128, j: int128, dx: uint256, min_dy: uint256):
     # When rounding errors happen, we undercharge admin fee in favor of LP
     self.balances[j] = old_balances[j] - dy - dy_admin_fee
 
-    ok: uint256 = cERC20(self.coins[j]).redeemUnderlying(dy)
+    ok: uint256 = cERC20(self.c_tokens[j]).redeemUnderlying(dy)
     if ok > 0:
         raise "Could not redeem coin"
 
@@ -524,7 +530,7 @@ def remove_liquidity(_amount: uint256, min_amounts: uint256[N_COINS]):
         self.balances[i] -= value
         amounts[i] = value
 
-        ok:uint256 = cERC20(self.coins[i]).redeemUnderlying(value)
+        ok:uint256 = cERC20(self.c_tokens[i]).redeemUnderlying(value)
         if ok > 0:
             raise "Could not redeem coin"
 
