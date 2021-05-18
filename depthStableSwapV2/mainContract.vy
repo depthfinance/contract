@@ -11,27 +11,11 @@ interface CurveToken:
 
 # External Contracts
 interface cERC20:
-    # def totalSupply() -> uint256: constant
-    # def allowance(_owner: address, _spender: address) -> uint256: constant
-    # def transfer(_to: address, _value: uint256) -> bool: modifying
-    # def transferFrom(_from: address, _to: address, _value: uint256) -> bool: modifying
     def approve(_spender: address, _value: uint256) -> bool: nonpayable
-    # def burn(_value: uint256): modifying
-    # def burnFrom(_to: address, _value: uint256): modifying
-    # def name() -> string[64]: constant
-    # def symbol() -> string[32]: constant
-    # def decimals() -> uint256: constant
     def balanceOf(arg0: address) -> uint256: view
     def mint(mintAmount: uint256) -> uint256: nonpayable
-    # def redeem(redeemTokens: uint256) -> uint256: modifying
     def redeemUnderlying(redeemAmount: uint256) -> uint256: nonpayable
     def exchangeRateStored() -> uint256: view
-    # def exchangeRateCurrent() -> uint256: modifying
-    # def supplyRatePerBlock() -> uint256: constant
-    # def accrualBlockNumber() -> uint256: constant
-
-# interface Curve:
-#     def exchange(i: int128, j: int128, dx: uint256, min_dy: uint256):
 
 # Events
 event TokenExchange:
@@ -101,8 +85,8 @@ N_COINS: constant(int128) = 2  # <- change
 FEE_DENOMINATOR: constant(uint256) = 10 ** 10
 LENDING_PRECISION: constant(uint256) = 10 ** 18
 PRECISION: constant(uint256) = 10 ** 18  # The precision to convert to
-PRECISION_MUL: constant(uint256[N_COINS]) = [10000000000, 1]
-RATES: constant(uint256[N_COINS]) = [10000000000000000000000000000, 1000000000000000000]
+PRECISION_MUL: constant(uint256[N_COINS]) = [10*10, 10*0]
+RATES: constant(uint256[N_COINS]) = [10**28, 10**18]
 # FEE_INDEX: constant(int128) = 2  # Which coin may potentially have fees (USDT)
 
 MAX_ADMIN_FEE: constant(uint256) = 10 * 10 ** 9
@@ -338,6 +322,8 @@ def add_liquidity(amounts: uint256[N_COINS], min_mint_amount: uint256):
             # mint cToken
             ERC20(self.coins[i]).approve(self.c_tokens[i], amounts[i])
             ok:uint256 = cERC20(self.c_tokens[i]).mint(amounts[i])
+            if ok > 0:
+                raise "Could not redeem coin"
 
         new_balances[i] = old_balances[i] + in_amount
 
@@ -504,6 +490,10 @@ def exchange(i: int128, j: int128, dx: uint256, min_dy: uint256):
     self.balances[i] = old_balances[i] + dx_w_fee
     # When rounding errors happen, we undercharge admin fee in favor of LP
     self.balances[j] = old_balances[j] - dy - dy_admin_fee
+
+    ok: uint256 = cERC20(self.coins[j]).redeemUnderlying(dy)
+    if ok > 0:
+        raise "Could not redeem coin"
 
     # "safeTransfer" which works for ERC20s which return bool or not
     _response = raw_call(
@@ -870,18 +860,10 @@ def withdraw_admin_fees():
     ERC20(self.coins[0]).transfer(msg.sender, redeem_amount)
 
 @external
-def donate_admin_fees():
-    assert msg.sender == self.owner  # dev: only owner
-    for i in range(N_COINS):
-        self.balances[i] = ERC20(self.coins[i]).balanceOf(self)
-
-
-@external
 def kill_me():
     assert msg.sender == self.owner  # dev: only owner
     assert self.kill_deadline > block.timestamp  # dev: deadline has passed
     self.is_killed = True
-
 
 @external
 def unkill_me():
