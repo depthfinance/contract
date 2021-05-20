@@ -7,7 +7,7 @@ import "./openzeppelin/contracts/token/ERC20/utils/SafeERC20.sol";
 import "./openzeppelin/contracts/security/Pausable.sol";
 import "./interfaces/IVault.sol";
 /**depth.fi vault***/
-contract dVault is ERC20,Ownable,Pausable {
+contract dCompVault is ERC20,Ownable,Pausable {
     using SafeERC20 for IERC20;
     using SafeMath for uint256;
 
@@ -160,5 +160,13 @@ contract dVault is ERC20,Ownable,Pausable {
 
     }
 
+    function pause() external onlyOwner {
+        _pause();
+    }
+
+
+    function unpause() external onlyOwner {
+        _unpause();
+    }
 
 }
