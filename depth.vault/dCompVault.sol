@@ -143,11 +143,11 @@ contract dCompVault is ERC20,Ownable,Pausable {
         require(_amount>0,"invalid amount");
         _burn(msg.sender, _amount);
 
-        uint256 _before = IERC20(want).balanceOf(address(this));
+        //uint256 _before = IERC20(want).balanceOf(address(this));
         //redeemUnderlying
 
         require(CToken(cTokenAddress).redeemUnderlying(_amount) == 0, "!withdraw");
-
+        IERC20(want).safeTransfer(msg.sender, _amount);
         balance=balance.sub(_amount);
 
     }
