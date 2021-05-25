@@ -20,7 +20,7 @@ contract dCompVault is ERC20,Ownable,Pausable {
     address public husdSwapAddress=0xED7d5F38C79115ca12fe6C0041abb22F0A06C300;//swap compound token to husd
     address public cTokenAddress;
     uint256 public balance;//total token balance
-    uint256 public minClaim=1;//min interest to claim
+    uint256 public minClaim=10**8;//min interest to claim default 1
     constructor (address _cTokenAddress) ERC20(
         string(abi.encodePacked("Depth.Fi Vault ", ERC20(_cTokenAddress).symbol())),
         string(abi.encodePacked("d", ERC20(_cTokenAddress).symbol()))
@@ -139,7 +139,7 @@ contract dCompVault is ERC20,Ownable,Pausable {
         _mint(msg.sender, _amount);
     }
     //withdraw
-    function withdraw(uint256 _amount) external whenNotPaused {
+    function withdraw(uint256 _amount) external {
         require(_amount>0,"invalid amount");
         _burn(msg.sender, _amount);
 
@@ -156,6 +156,7 @@ contract dCompVault is ERC20,Ownable,Pausable {
         require(_swapAddress!=address(0),"invalid swap address");
         require(_miningToken!=address(0),"invalid mining token address");
         ISwapMining(_swapAddress).takerWithdraw();
+        require(_miningToken!=cTokenAddress,"can not claim ctoken");
         IERC20(_miningToken).safeTransfer(msg.sender,IERC20(_miningToken).balanceOf(address(this)));
 
     }
