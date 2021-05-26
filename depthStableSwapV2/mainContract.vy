@@ -85,7 +85,7 @@ N_COINS: constant(int128) = 2  # <- change
 FEE_DENOMINATOR: constant(uint256) = 10 ** 10
 LENDING_PRECISION: constant(uint256) = 10 ** 18
 PRECISION: constant(uint256) = 10 ** 18  # The precision to convert to
-PRECISION_MUL: constant(uint256[N_COINS]) = [10*10, 10*0]
+PRECISION_MUL: constant(uint256[N_COINS]) = [10**10, 10**0]
 RATES: constant(uint256[N_COINS]) = [10**28, 10**18]
 # FEE_INDEX: constant(int128) = 2  # Which coin may potentially have fees (USDT)
 
@@ -497,8 +497,8 @@ def exchange(i: int128, j: int128, dx: uint256, min_dy: uint256):
     # When rounding errors happen, we undercharge admin fee in favor of LP
     self.balances[j] = old_balances[j] - dy - dy_admin_fee
 
-    ok: uint256 = cERC20(self.c_tokens[j]).redeemUnderlying(dy)
-    if ok > 0:
+    ok2: uint256 = cERC20(self.c_tokens[j]).redeemUnderlying(dy)
+    if ok2 > 0:
         raise "Could not redeem coin"
 
     # "safeTransfer" which works for ERC20s which return bool or not
