@@ -23,14 +23,12 @@ interface CompControl {
     // Claim all the COMP accrued by holder in specific markets
     function claimComp(address holder, address[] calldata cTokens) external;
     function getCompAddress() external view returns (address);
+    function claimCan(address holder, address[] calldata cTokens) external;
+    function getCanAddress() external view returns (address);
 
 }
-interface UsdtSwapRouter {
-    function exchange_underlying(int128, int128, uint256, uint256) external;
-}
-interface HusdSwapRouter {
-    function getAmountsOut(uint amountIn, address[] calldata path) external returns (uint256[] memory);
-    function swapExactTokensForTokens(uint amountIn, uint amountOutMin, address[] calldata path, address to, uint deadline) external returns (uint[] memory amounts);
+interface IHusdSwap {
+    function swapTokensToHusd(address _token,uint256 _amount) external;
 }
 interface IDao {
     function donateHUSD(uint256 amount) external;
