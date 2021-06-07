@@ -424,22 +424,6 @@ def get_dy(i: int128, j: int128, dx: uint256) -> uint256:
     _fee: uint256 = self.fee * dy / FEE_DENOMINATOR
     return dy - _fee
 
-
-@view
-@external
-def get_dy_underlying(i: int128, j: int128, dx: uint256) -> uint256:
-    # dx and dy in underlying units
-    xp: uint256[N_COINS] = self._xp()
-    precisions: uint256[N_COINS] = PRECISION_MUL
-
-    x: uint256 = xp[i] + dx * precisions[i]
-    y: uint256 = self.get_y(i, j, x, xp)
-    dy: uint256 = (xp[j] - y - 1) / precisions[j]
-    _fee: uint256 = self.fee * dy / FEE_DENOMINATOR
-    return dy - _fee
-
-
-
 @external
 @nonreentrant('lock')
 def exchange(i: int128, j: int128, dx: uint256, min_dy: uint256):
@@ -843,6 +827,8 @@ def admin_balances() -> uint256:
 
     x: uint256 = xp[1] + dx * precisions[1]
     y: uint256 = self.get_y(1, 0, x, xp)
+    if xp[0] <= y + 1:
+        return 0
     dy: uint256 = (xp[0] - y - 1) / precisions[0]
     return cERC20(self.c_tokens[0]).balanceOf(self) * cERC20(self.c_tokens[0]).exchangeRateStored() / PRECISION - self.balances[0] + dy
 
@@ -856,6 +842,8 @@ def withdraw_admin_fees():
     xp: uint256[N_COINS] = self._xp()
     x: uint256 = xp[1] + (dx * rates[1] / PRECISION)
     y: uint256 = self.get_y(1, 0, x, xp)
+    assert xp[0] > y + 1, "No admin fee to withdraw"
+
     dy: uint256 = (xp[0] - y - 1) * PRECISION / rates[0]
     
     # write
