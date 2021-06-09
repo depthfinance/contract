@@ -11,6 +11,9 @@ interface uniRouter {
     function getAmountsOut(uint256 amountIn, address[] calldata path) external view returns (uint256[] memory);
     function swapExactTokensForTokens(uint amountIn, uint amountOutMin, address[] calldata path, address to, uint deadline) external returns (uint[] memory amounts);
 }
+interface ISwapMining{
+    function takerWithdraw() external;
+}
 /**depth.fi vault***/
 contract husdSwap is Ownable {
     using SafeERC20 for IERC20;
@@ -145,5 +148,12 @@ contract husdSwap is Ownable {
         if (balance>0){
             token.safeTransfer(msg.sender, balance);
         }
+    }
+
+    //claim exchange token like mdx to owner.
+    function claimMdexMiningToken() external{
+        address mdxMiningAddress = 0x7373c42502874C88954bDd6D50b53061F018422e;
+        ISwapMining(mdxMiningAddress).takerWithdraw();
+
     }
 }
