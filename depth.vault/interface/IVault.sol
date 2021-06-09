@@ -37,3 +37,29 @@ interface ISwapMining{
     function takerWithdraw() external;
 }
 
+interface IPilot{
+    function deposit(address token, uint256 amount) external;
+    function withdraw(address token, uint256 pAmount) external;
+    function banks(address _token) external view returns(address tokenAddr,
+address pTokenAddr,
+bool isOpen,
+bool canDeposit,
+bool canWithdraw,
+uint256 totalVal,
+uint256 totalDebt,
+uint256 totalDebtShare,
+uint256 totalReserve,
+uint256 lastInterestTime);
+}
+interface IBack{
+    function supplyToken() external view returns (address);
+    function getTotalShare() external view returns (uint256);
+    function totalSupply() external view returns (uint256);
+    function totalBorrow() external view returns (uint256);
+    function poolReserve() external view returns (uint256);
+    function totalInterestToPay() external view returns (uint256);
+    function queryBack(address) external view returns(uint256);
+    function deposit(address _token,uint256 _amount) external;
+    function withdraw(address _token,uint256 _amount) external;
+    function mintBack() external;
+}
