@@ -16,6 +16,13 @@ interface cERC20:
     def mint(mintAmount: uint256) -> uint256: nonpayable
     def redeemUnderlying(redeemAmount: uint256) -> uint256: nonpayable
     def exchangeRateStored() -> uint256: view
+    
+interface SellLendPlatformToken:
+    def claim_lending_platform_token() : nonpayable
+    def sell_lending_platform_token(amount: uint256) -> bool: nonpayable
+
+interface DAO:
+    def donateHUSD(amount: uint256) : nonpayable
 
 # Events
 event TokenExchange:
@@ -122,6 +129,10 @@ KILL_DEADLINE_DT: constant(uint256) = 2 * 30 * 86400
 
 c_tokens: public(address[N_COINS])
 
+lend_plartform_token: public(ERC20)
+sell_lend_plartform_token: public(SellLendPlatformToken)
+dao: public(address)
+
 @external
 def __init__(
     _owner: address,
@@ -130,7 +141,10 @@ def __init__(
     _pool_token: address,
     _A: uint256,
     _fee: uint256,
-    _admin_fee: uint256
+    _admin_fee: uint256,
+    _lend_plartform_token: address,
+    _sell_lend_plartform_token: address,
+    _dao: address
 ):
     """
     @notice Contract constructor
@@ -153,6 +167,9 @@ def __init__(
     self.kill_deadline = block.timestamp + KILL_DEADLINE_DT
     self.token = CurveToken(_pool_token)
     self.c_tokens = _c_tokens
+    self.lend_plartform_token = ERC20(_lend_plartform_token)
+    self.sell_lend_plartform_token = SellLendPlatformToken(_sell_lend_plartform_token)
+    self.dao = _dao
 
 
 @view
@@ -276,10 +293,86 @@ def calc_token_amount(amounts: uint256[N_COINS], deposit: bool) -> uint256:
     return diff * token_amount / D0
 
 
+
+
+
+@view
+@internal
+def get_y(i: int128, j: int128, x: uint256, xp_: uint256[N_COINS]) -> uint256:
+    # x in the input is converted to the same price/precision
+
+    assert i != j       # dev: same coin
+    assert j >= 0       # dev: j below zero
+    assert j < N_COINS  # dev: j above N_COINS
+
+    # should be unreachable, but good for safety
+    assert i >= 0
+    assert i < N_COINS
+
+    amp: uint256 = self._A()
+    D: uint256 = self.get_D(xp_, amp)
+    c: uint256 = D
+    S_: uint256 = 0
+    Ann: uint256 = amp * N_COINS
+
+    _x: uint256 = 0
+    for _i in range(N_COINS):
+        if _i == i:
+            _x = x
+        elif _i != j:
+            _x = xp_[_i]
+        else:
+            continue
+        S_ += _x
+        c = c * D / (_x * N_COINS)
+    c = c * D / (Ann * N_COINS)
+    b: uint256 = S_ + D / Ann  # - D
+    y_prev: uint256 = 0
+    y: uint256 = D
+    for _i in range(255):
+        y_prev = y
+        y = (y*y + c) / (2 * y + b - D)
+        # Equality with the precision of 1
+        if y > y_prev:
+            if y - y_prev <= 1:
+                break
+        else:
+            if y_prev - y <= 1:
+                break
+    return y
+
+@internal
+def _donate_dao():
+    self.sell_lend_plartform_token.claim_lending_platform_token()
+    token_balance: uint256 = self.lend_plartform_token.balanceOf(self)
+    self.sell_lend_plartform_token.sell_lending_platform_token(token_balance)
+
+    # calculation
+    dx: uint256 = cERC20(self.c_tokens[1]).balanceOf(self) * cERC20(self.c_tokens[1]).exchangeRateStored() / PRECISION - self.balances[1]
+    rates: uint256[N_COINS] = RATES
+    xp: uint256[N_COINS] = self._xp()
+    x: uint256 = xp[1] + (dx * rates[1] / PRECISION)
+    y: uint256 = self.get_y(1, 0, x, xp)
+    assert xp[0] > y + 1, "No admin fee to withdraw"
+
+    dy: uint256 = (xp[0] - y - 1) * PRECISION / rates[0]
+    
+    # write
+    self.balances[0] -= dy
+    self.balances[1] -= dx
+    redeem_amount: uint256 = cERC20(self.c_tokens[0]).balanceOf(self) * cERC20(self.c_tokens[0]).exchangeRateStored() / PRECISION - self.balances[0] + dy
+    cERC20(self.c_tokens[0]).redeemUnderlying(redeem_amount)
+
+    husd_balance: uint256 = ERC20(self.coins[0]).balanceOf(self)
+    ERC20(self.coins[0]).approve(self.dao, husd_balance)
+    DAO(self.dao).donateHUSD(husd_balance)
+
 @external
 @nonreentrant('lock')
 def add_liquidity(amounts: uint256[N_COINS], min_mint_amount: uint256):
     assert not self.is_killed  # dev: is killed
+    
+    self._donate_dao()
 
     fees: uint256[N_COINS] = empty(uint256[N_COINS])
     _fee: uint256 = self.fee * N_COINS / (4 * (N_COINS - 1))
@@ -363,52 +456,6 @@ def add_liquidity(amounts: uint256[N_COINS], min_mint_amount: uint256):
     self.token.mint(msg.sender, mint_amount)
 
     log AddLiquidity(msg.sender, amounts, fees, D1, token_supply + mint_amount)
-
-
-@view
-@internal
-def get_y(i: int128, j: int128, x: uint256, xp_: uint256[N_COINS]) -> uint256:
-    # x in the input is converted to the same price/precision
-
-    assert i != j       # dev: same coin
-    assert j >= 0       # dev: j below zero
-    assert j < N_COINS  # dev: j above N_COINS
-
-    # should be unreachable, but good for safety
-    assert i >= 0
-    assert i < N_COINS
-
-    amp: uint256 = self._A()
-    D: uint256 = self.get_D(xp_, amp)
-    c: uint256 = D
-    S_: uint256 = 0
-    Ann: uint256 = amp * N_COINS
-
-    _x: uint256 = 0
-    for _i in range(N_COINS):
-        if _i == i:
-            _x = x
-        elif _i != j:
-            _x = xp_[_i]
-        else:
-            continue
-        S_ += _x
-        c = c * D / (_x * N_COINS)
-    c = c * D / (Ann * N_COINS)
-    b: uint256 = S_ + D / Ann  # - D
-    y_prev: uint256 = 0
-    y: uint256 = D
-    for _i in range(255):
-        y_prev = y
-        y = (y*y + c) / (2 * y + b - D)
-        # Equality with the precision of 1
-        if y > y_prev:
-            if y - y_prev <= 1:
-                break
-        else:
-            if y_prev - y <= 1:
-                break
-    return y
 
 
 @view
@@ -503,7 +550,10 @@ def exchange(i: int128, j: int128, dx: uint256, min_dy: uint256):
 
 @external
 @nonreentrant('lock')
-def remove_liquidity(_amount: uint256, min_amounts: uint256[N_COINS]):
+def remove_liquidity(_amount: uint256, min_amounts: uint256[N_COINS], donate: bool):
+    if donate:
+        self._donate_dao()
+
     total_supply: uint256 = self.token.totalSupply()
     amounts: uint256[N_COINS] = empty(uint256[N_COINS])
     fees: uint256[N_COINS] = empty(uint256[N_COINS])  # Fees are unused but we've got them historically in event
@@ -538,8 +588,11 @@ def remove_liquidity(_amount: uint256, min_amounts: uint256[N_COINS]):
 
 @external
 @nonreentrant('lock')
-def remove_liquidity_imbalance(amounts: uint256[N_COINS], max_burn_amount: uint256):
+def remove_liquidity_imbalance(amounts: uint256[N_COINS], max_burn_amount: uint256, donate: bool):
     assert not self.is_killed  # dev: is killed
+
+    if donate:
+        self._donate_dao()
 
     token_supply: uint256 = self.token.totalSupply()
     assert token_supply != 0  # dev: zero total supply
@@ -683,11 +736,14 @@ def calc_withdraw_one_coin(_token_amount: uint256, i: int128) -> uint256:
 
 @external
 @nonreentrant('lock')
-def remove_liquidity_one_coin(_token_amount: uint256, i: int128, min_amount: uint256):
+def remove_liquidity_one_coin(_token_amount: uint256, i: int128, min_amount: uint256, donate: bool):
     """
     Remove _amount of liquidity all in a form of coin i
     """
     assert not self.is_killed  # dev: is killed
+
+    if donate:
+        self._donate_dao()
 
     dy: uint256 = 0
     dy_fee: uint256 = 0
@@ -833,25 +889,8 @@ def admin_balances() -> uint256:
     return cERC20(self.c_tokens[0]).balanceOf(self) * cERC20(self.c_tokens[0]).exchangeRateStored() / PRECISION - self.balances[0] + dy
 
 @external
-def withdraw_admin_fees():
-    assert msg.sender == self.owner  # dev: only owner
-
-    # calculation
-    dx: uint256 = cERC20(self.c_tokens[1]).balanceOf(self) * cERC20(self.c_tokens[1]).exchangeRateStored() / PRECISION - self.balances[1]
-    rates: uint256[N_COINS] = RATES
-    xp: uint256[N_COINS] = self._xp()
-    x: uint256 = xp[1] + (dx * rates[1] / PRECISION)
-    y: uint256 = self.get_y(1, 0, x, xp)
-    assert xp[0] > y + 1, "No admin fee to withdraw"
-
-    dy: uint256 = (xp[0] - y - 1) * PRECISION / rates[0]
-    
-    # write
-    self.balances[0] -= dy
-    self.balances[1] -= dx
-    redeem_amount: uint256 = cERC20(self.c_tokens[0]).balanceOf(self) * cERC20(self.c_tokens[0]).exchangeRateStored() / PRECISION - self.balances[0] + dy
-    cERC20(self.c_tokens[0]).redeemUnderlying(redeem_amount)
-    ERC20(self.coins[0]).transfer(msg.sender, redeem_amount)
+def manually_donate():
+    self._donate_dao()
 
 @external
 def kill_me():
