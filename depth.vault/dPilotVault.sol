@@ -51,11 +51,13 @@ contract dPilotVault is ERC20,Ownable,Pausable {
     }
     // set husd swap contract address
     function setHusdSwapAddress(address _address)   external onlyOwner{
+        require(_address!=address(0),"no address!");
         husdSwapAddress = _address;
     }
 
     // set dao contract address
     function setDaoAddress(address _address)   external onlyOwner{
+        require(_address!=address(0),"no address!");
         daoAddress = _address;
     }
 
@@ -68,7 +70,7 @@ contract dPilotVault is ERC20,Ownable,Pausable {
         IERC20(_token).safeApprove(husdSwapAddress,_amount);
         IHusdSwap(husdSwapAddress).swapTokensToHusd(_token,_amount);
     }
-    function getPTokenAmount(uint256 _amount) internal view returns(uint256){
+    function getPTokenAmount(uint256 _amount) public view returns(uint256){
         uint256 total =IPilot(pilotAddress).totalToken(want);
         uint256 pTotal = IERC20(pTokenAddress).totalSupply();
         uint256 pAmount = (total == 0 || pTotal == 0) ? _amount: _amount.mul(pTotal).div(total);
@@ -93,7 +95,7 @@ contract dPilotVault is ERC20,Ownable,Pausable {
             uint256 _claimAmount = _interest<_compUnderlyingBalance?_interest:_compUnderlyingBalance;
             uint256 pAmount = getPTokenAmount(_claimAmount);
             uint256 _before = IERC20(want).balanceOf(address(this));
-            IERC20(pTokenAddress).safeApprove(pilotAddress, pAmount);
+            //IERC20(pTokenAddress).safeApprove(pilotAddress, pAmount);
             IPilot(pilotAddress).withdraw(want,pAmount);
             uint256 _after = IERC20(want).balanceOf(address(this));
 
@@ -104,7 +106,7 @@ contract dPilotVault is ERC20,Ownable,Pausable {
 
         //donate husd to dao
         uint256 _husdBalance = IERC20(husd).balanceOf(address(this));
-        IERC20(husd).approve(daoAddress,_husdBalance);
+        IERC20(husd).safeApprove(daoAddress,_husdBalance);
         //call dao address donate husd
         IDao(daoAddress).donateHUSD(_husdBalance);
 
@@ -136,7 +138,7 @@ contract dPilotVault is ERC20,Ownable,Pausable {
         uint256 pAmount = getPTokenAmount(_amount);
         require(pAmount>0,"invalid pAmount");
         uint256 _before = IERC20(want).balanceOf(address(this));
-        IERC20(pTokenAddress).safeApprove(pilotAddress, pAmount);
+        //IERC20(pTokenAddress).safeIncreaseAllowance(pilotAddress, pAmount);
         IPilot(pilotAddress).withdraw(want,pAmount);
         uint256 _after = IERC20(want).balanceOf(address(this));
 
@@ -157,6 +159,9 @@ contract dPilotVault is ERC20,Ownable,Pausable {
 
     function pause() external onlyOwner {
         _pause();
+    }
+    function decimals() public view override returns (uint8) {
+        return ERC20(want).decimals();
     }
 
 
