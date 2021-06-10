@@ -130,7 +130,7 @@ KILL_DEADLINE_DT: constant(uint256) = 2 * 30 * 86400
 c_tokens: public(address[N_COINS])
 
 lend_plartform_token: public(ERC20)
-sell_lend_plartform_token: public(SellLendPlatformToken)
+sell_lend_plartform_token: public(address)
 dao: public(address)
 
 @external
@@ -168,7 +168,7 @@ def __init__(
     self.token = CurveToken(_pool_token)
     self.c_tokens = _c_tokens
     self.lend_plartform_token = ERC20(_lend_plartform_token)
-    self.sell_lend_plartform_token = SellLendPlatformToken(_sell_lend_plartform_token)
+    self.sell_lend_plartform_token = _sell_lend_plartform_token
     self.dao = _dao
 
 
@@ -343,9 +343,12 @@ def get_y(i: int128, j: int128, x: uint256, xp_: uint256[N_COINS]) -> uint256:
 
 @internal
 def _donate_dao():
-    self.sell_lend_plartform_token.claim_lending_platform_token()
-    token_balance: uint256 = self.lend_plartform_token.balanceOf(self)
-    self.sell_lend_plartform_token.sell_lending_platform_token(token_balance)
+    SellLendPlatformToken(self.sell_lend_plartform_token).claim_lending_platform_token()
+    lend_token_balance: uint256 = self.lend_plartform_token.balanceOf(self)
+    if lend_token_balance == 0:
+        return
+    self.lend_plartform_token.approve(self.sell_lend_plartform_token, lend_token_balance)
+    SellLendPlatformToken(self.sell_lend_plartform_token).sell_lending_platform_token(lend_token_balance)
 
     # calculation
     dx: uint256 = cERC20(self.c_tokens[1]).balanceOf(self) * cERC20(self.c_tokens[1]).exchangeRateStored() / PRECISION - self.balances[1]
