@@ -38,6 +38,7 @@ interface ISwapMining{
 }
 
 interface IPilot{
+    function totalToken(address token) external view returns (uint256);
     function deposit(address token, uint256 amount) external;
     function withdraw(address token, uint256 pAmount) external;
     function banks(address _token) external view returns(address tokenAddr,
