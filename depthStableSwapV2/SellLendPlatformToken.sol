@@ -109,7 +109,7 @@ interface ClaimComp is ERC20 {
 
 interface MDexRouter {
     function swapExactTokensForTokens(uint amountIn, uint amountOutMin, address[] calldata path, address to, uint deadline) external returns (uint[] memory amounts);
-    function getAmountsOut(uint amountIn, address[] calldata path) external returns (uint256);
+    function getAmountsOut(uint amountIn, address[] calldata path) external returns (uint256[] memory);
 }
 
 contract SellLendPlatformToken{
@@ -134,32 +134,27 @@ contract SellLendPlatformToken{
 
     function sell_lending_platform_token(uint256 lhbAmount) external returns (bool){
         require(lhb.transferFrom(msg.sender, address(this), lhbAmount));
-        
-        address[] memory path1 = new address[](2);
+
+        address[] memory path1 = new address[](3);
         path1[0] = address(lhb);
-        path1[1] = address(husd);
-        uint256 amount1 = mdex.getAmountsOut(lhbAmount, path1);
+        path1[1] = address(wht);
+        path1[2] = address(husd);
+        uint256 amount1 = mdex.getAmountsOut(lhbAmount, path1)[2];
 
         address[] memory path2 = new address[](3);
         path2[0] = address(lhb);
-        path2[1] = address(wht);
-        path2[2] = address(husd);
-        uint256 amount2 = mdex.getAmountsOut(lhbAmount, path2);
-
-        address[] memory path3 = new address[](3);
-        path2[0] = address(lhb);
         path2[1] = address(usdt);
         path2[2] = address(husd);
-        uint256 amount3 = mdex.getAmountsOut(lhbAmount, path3);
+        uint256 amount2 = mdex.getAmountsOut(lhbAmount, path2)[2];
 
         address[] memory path;
-        if (amount1 >= amount2 && amount1 >= amount3) {
+        
+        if (amount1 > amount2) {
             path = path1;
-        } else if (amount2 >= amount1 && amount2 >= amount3) { 
-            path = path2;
         } else {
-            path = path3;
+            path = path2;
         }
+        
         lhb.approve(address(mdex), lhbAmount);
         
         // Try to swap LHB for lHUSD or lUSDT. This action may fail beacuse lack of liqudility.
@@ -172,7 +167,7 @@ contract SellLendPlatformToken{
         } catch (bytes memory) {
             // swap failed, return token back to main contract
             lhb.transfer(msg.sender, lhbAmount);
-            return false;
+            return true;
         }
     }
 }
