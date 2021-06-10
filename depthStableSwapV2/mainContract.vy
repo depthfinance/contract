@@ -362,8 +362,8 @@ def _donate_dao():
     
     # write
     self.balances[0] -= dy
-    self.balances[1] -= dx
-    redeem_amount: uint256 = cERC20(self.c_tokens[0]).balanceOf(self) * cERC20(self.c_tokens[0]).exchangeRateStored() / PRECISION - self.balances[0] + dy
+    self.balances[1] += dx
+    redeem_amount: uint256 = cERC20(self.c_tokens[0]).balanceOf(self) * cERC20(self.c_tokens[0]).exchangeRateStored() / PRECISION - self.balances[0]
     cERC20(self.c_tokens[0]).redeemUnderlying(redeem_amount)
 
     husd_balance: uint256 = ERC20(self.coins[0]).balanceOf(self)
