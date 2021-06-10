@@ -112,15 +112,7 @@ interface MDexRouter {
     function getAmountsOut(uint amountIn, address[] calldata path) external returns (uint256);
 }
 
-interface DAOPool {
-    function donateHUSD(uint256 amount) external;
-}
-
 contract SellLendPlatformToken{
-
-    address internal _mainContractAddress;
-    
-    address public daoAddress;
 
     MDexRouter constant mdex             = MDexRouter(0xED7d5F38C79115ca12fe6C0041abb22F0A06C300);
     ERC20      constant lhb              = ERC20(0x8F67854497218043E1f72908FFE38D0Ed7F24721);
@@ -131,13 +123,7 @@ contract SellLendPlatformToken{
     CERC20     constant lusdt            = CERC20(0xc502F3f6f1b71CB7d856E70B574D27d942C2993C);
     ClaimComp  constant claimLHBContract = ClaimComp(0x6537d6307ca40231939985BCF7D83096Dd1B4C09);
 
-    constructor(address mainContractAddress, address _daoAddress) public {
-        _mainContractAddress = mainContractAddress;
-        daoAddress = _daoAddress;
-    }
-
     function claim_lending_platform_token() external {
-        assert(msg.sender == _mainContractAddress);
         // This method calim LHB token for main contract.
         // Since this contract is replaceable, we can rewrite this method if we have to.
         address[] memory cTokens = new address[](2);
@@ -147,7 +133,6 @@ contract SellLendPlatformToken{
     }
 
     function sell_lending_platform_token(uint256 lhbAmount) external returns (bool){
-        assert(msg.sender == _mainContractAddress);
         require(lhb.transferFrom(msg.sender, address(this), lhbAmount));
         
         address[] memory path1 = new address[](2);
@@ -181,7 +166,7 @@ contract SellLendPlatformToken{
         try mdex.swapExactTokensForTokens(lhbAmount, 0, path, address(this), now) returns (uint256[] memory amounts) {
             uint256 husdBalance = husd.balanceOf(address(this));
             if(husdBalance == 0)
-                return 0;
+                return true;
             husd.transfer(msg.sender, husdBalance);
             return true;
         } catch (bytes memory) {
