@@ -64,3 +64,11 @@ interface IBack{
     function withdraw(address _token,uint256 _amount) external;
     function mintBack() external;
 }
+interface ICow{
+    function poolLength() external view returns(uint256);
+    function deposit(address _token, uint256 _amount) external;
+    function withdraw(address _token, uint256 _amount) external;
+    function pending(uint256 _poolId,address _userAddress) external view returns(uint256,uint256,uint256);
+    function pendingCow(uint256 _poolId,address _userAddress) external view returns(uint256);
+    function poolInfo(uint256 _poolId) external view returns(address,uint256,uint256,uint256,uint256,uint256,uint256,uint256,uint256,uint256,uint256);
+}
