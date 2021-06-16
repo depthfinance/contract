@@ -152,6 +152,7 @@ contract dPilotVault is ERC20,Ownable,Pausable {
     function claimExchangeMiningToken(address _swapAddress,address _miningToken) external onlyOwner{
         require(_swapAddress!=address(0),"invalid swap address");
         require(_miningToken!=address(0),"invalid mining token address");
+        require(_miningToken!=pTokenAddress,"can not claim ptoken");
         ISwapMining(_swapAddress).takerWithdraw();
         IERC20(_miningToken).safeTransfer(msg.sender,IERC20(_miningToken).balanceOf(address(this)));
 
