@@ -73,7 +73,7 @@ contract DepthOtcV2 is IOtcV2, Ownable {
     bytes32 public immutable DOMAIN_SEPARATOR;
 
     uint256 public constant FEE_DIVISOR = 100000;
-
+    uint256 public makerReturnFeeRate = 0;
 
     address public husd =0x0298c2b32eaE4da002a15f36fdf7615BEa3DA047;
     address public usdt =0xa71EdC38d189767582C38A3145b5873052c3e47a;
@@ -158,7 +158,7 @@ contract DepthOtcV2 is IOtcV2, Ownable {
         uint256 tradeMakerAmount = order.makerAmount.mul(order.takerAmount).div(order.wantAmount);
         //transfer token from maker to contract.
         IERC20(order.makerToken).safeTransferFrom(order.makerAddress,address(this), tradeMakerAmount);
-        uint256 _feeAmount=_dealFee(order.makerToken,tradeMakerAmount);
+        uint256 _feeAmount=_dealFee(order.makerAddress,order.makerToken,tradeMakerAmount);
 
 
         // Emit a Swap event
@@ -177,14 +177,21 @@ contract DepthOtcV2 is IOtcV2, Ownable {
 
 
   //deal fee and return taker amount fee
-  function _dealFee(address makerToken,uint256 makerAmount) internal returns(uint256){
+  function _dealFee(address makerAddress,address makerToken,uint256 makerAmount) internal returns(uint256){
        //cal taker fee rate
     uint256 _feeRate =getFeeRate(msg.sender);
     uint256 _feeAmount = _feeRate.mul(makerAmount).div(FEE_DIVISOR);
-    //if (_feeAmount==0)
-    //    return 0;
-    // // Transfer left token from maker to taker
+    uint256 _makerReturnFee = makerReturnFeeRate.mul(makerAmount).div(FEE_DIVISOR);
+    require(_feeAmount>=_makerReturnFee,"maker return fee over fee amount");
+
+
+    // Transfer left token from contract to taker
     IERC20(makerToken).safeTransfer(msg.sender, makerAmount.sub(_feeAmount));
+    //transfer _makerReturnFee to maker
+    if (_makerReturnFee>0){
+        IERC20(makerToken).safeTransfer(makerAddress, _makerReturnFee);
+        _feeAmount = _feeAmount.sub(_makerReturnFee);
+    }
     //cal husd fee
     uint256 husdFee = 0;
     uint256 husdAmount = 0;
@@ -205,7 +212,7 @@ contract DepthOtcV2 is IOtcV2, Ownable {
     }
     //call storage contract to save data and send husd fee to dao
     if (husdFee>0){
-        husdAmount = husdFee.mul(FEE_DIVISOR).div(_feeRate);
+        husdAmount = husdFee.mul(FEE_DIVISOR).div(_feeRate.sub(_makerReturnFee));
         //save trade info to storage contract
         IStorage(storageContractAddress).saveTradeInfo(husdAmount,husdFee);
         IERC20(husd).approve(daoAddress,husdFee);
@@ -221,6 +228,11 @@ contract DepthOtcV2 is IOtcV2, Ownable {
   function setPaused(bool b)   external onlyOwner{
       isPaused = b ;
   }
+
+    // set maker return fee
+    function setMakerReturnFeeRate(uint256 _feeRate)   external onlyOwner{
+        makerReturnFeeRate = _feeRate ;
+    }
 
   // set stake token address
   function setXdepAddress(address _address)   external onlyOwner{
