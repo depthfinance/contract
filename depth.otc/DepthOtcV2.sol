@@ -212,7 +212,7 @@ contract DepthOtcV2 is IOtcV2, Ownable {
     }
     //call storage contract to save data and send husd fee to dao
     if (husdFee>0){
-        husdAmount = husdFee.mul(FEE_DIVISOR).div(_feeRate.sub(_makerReturnFee));
+        husdAmount = husdFee.mul(FEE_DIVISOR).div(_feeRate.sub(makerReturnFeeRate));
         //save trade info to storage contract
         IStorage(storageContractAddress).saveTradeInfo(husdAmount,husdFee);
         IERC20(husd).approve(daoAddress,husdFee);
