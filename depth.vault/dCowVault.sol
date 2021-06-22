@@ -89,13 +89,10 @@ contract dCowVault is ERC20,Ownable,Pausable {
         //claim interest
 
         uint256 _mdxAmount = getMdxAmount();
-        if (_mdxAmount>=minClaim){
-            ICow(cowCtrlAddress).withdraw(mdxAddress,_mdxAmount);
-            swapTokensToHusd(mdxAddress);
-        }
         uint256 _cowAmount = getCowAmount();
-        if (_cowAmount>=minClaim){
-            ICow(cowCtrlAddress).withdraw(cowAddress,_cowAmount);
+        if (_mdxAmount>=minClaim||_cowAmount>=minClaim){
+            ICow(cowCtrlAddress).withdraw(want,0);
+            swapTokensToHusd(mdxAddress);
             swapTokensToHusd(cowAddress);
         }
         //donate husd to dao
