@@ -111,7 +111,7 @@ contract dBoosterVault is ERC20,Ownable,Pausable {
     //deposit
     function deposit(uint256 _amount) external whenNotPaused {
         require(_amount>0,"invalid amount");
-
+        require(maxLimit==0||balance.add(_amount)<=maxLimit,"exceed max deposit limit");
         IERC20(want).safeTransferFrom(msg.sender, address(this), _amount);
         //deposit token to compound
         IERC20(want).safeApprove(boosterSafeBox, _amount);
