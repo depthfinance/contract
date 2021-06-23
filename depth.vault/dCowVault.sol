@@ -83,7 +83,15 @@ contract dCowVault is ERC20,Ownable,Pausable {
     function getRemaining() public view returns(uint256){
         ICow cow=ICow(cowCtrlAddress);
         (,,,,,uint256 _totalAmount,uint256 _totalAmountLimit,,,,)=cow.poolInfo(cowPoolId);
-        return _totalAmountLimit.sub(_totalAmount);
+        uint256 _remaining = _totalAmountLimit.sub(_totalAmount);
+        if(maxLimit>0){
+            if (maxLimit<=balance){
+                _remaining =0;
+            }else{
+                _remaining = _remaining>maxLimit.sub(balance)?maxLimit.sub(balance):_remaining;
+            }
+        }
+        return _remaining;
     }
     function harvest() public{
         //claim interest
@@ -106,7 +114,7 @@ contract dCowVault is ERC20,Ownable,Pausable {
     //deposit
     function deposit(uint256 _amount) external whenNotPaused {
         require(_amount>0,"invalid amount");
-
+        require(getRemaining()>=_amount,"exceed max deposit limit");
         IERC20(want).safeTransferFrom(msg.sender, address(this), _amount);
         //deposit token to compound
         IERC20(want).safeApprove(cowCtrlAddress, _amount);
