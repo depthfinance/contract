@@ -72,3 +72,18 @@ interface ICow{
     function pendingCow(uint256 _poolId,address _userAddress) external view returns(uint256);
     function poolInfo(uint256 _poolId) external view returns(address,uint256,uint256,uint256,uint256,uint256,uint256,uint256,uint256,uint256,uint256);
 }
+interface IBooster{
+    function deposit(uint256 _value) external ;
+    function withdraw(uint256 _tTokenAmount) external;
+    function poolDepositId() external view returns(uint256);
+    function token() external view returns(address);
+    function getBaseTokenPerLPToken() external view returns(uint256);
+}
+interface IBoosterStakePool{
+    function deposit(uint256 _pid, uint256 _amount) external;
+    function withdraw(uint256 _pid, uint256 _amount) external;
+    function pendingRewards(uint256 _pid, address _user) external view returns (uint256 value);
+    function claim(uint256 _pid) external;
+    function getATUserAmount(uint256 _pid,address _user) external view returns(uint256);
+
+}
