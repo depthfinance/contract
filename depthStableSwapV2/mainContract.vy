@@ -292,10 +292,6 @@ def calc_token_amount(amounts: uint256[N_COINS], deposit: bool) -> uint256:
         diff = D0 - D1
     return diff * token_amount / D0
 
-
-
-
-
 @view
 @internal
 def get_y(i: int128, j: int128, x: uint256, xp_: uint256[N_COINS]) -> uint256:
@@ -343,30 +339,33 @@ def get_y(i: int128, j: int128, x: uint256, xp_: uint256[N_COINS]) -> uint256:
 
 @internal
 def _donate_dao():
+
+    # sell lending platform token for husd
     SellLendPlatformToken(self.sell_lend_plartform_token).claim_lending_platform_token()
     lend_token_balance: uint256 = self.lend_plartform_token.balanceOf(self)
-    if lend_token_balance == 0:
-        return
-    self.lend_plartform_token.approve(self.sell_lend_plartform_token, lend_token_balance)
-    SellLendPlatformToken(self.sell_lend_plartform_token).sell_lending_platform_token(lend_token_balance)
+    if lend_token_balance != 0:
+        self.lend_plartform_token.approve(self.sell_lend_plartform_token, lend_token_balance)
+        SellLendPlatformToken(self.sell_lend_plartform_token).sell_lending_platform_token(lend_token_balance)
 
-    # calculation
-    dx: uint256 = cERC20(self.c_tokens[1]).balanceOf(self) * cERC20(self.c_tokens[1]).exchangeRateStored() / PRECISION - self.balances[1]
-    rates: uint256[N_COINS] = RATES
-    xp: uint256[N_COINS] = self._xp()
-    x: uint256 = xp[1] + (dx * rates[1] / PRECISION)
-    y: uint256 = self.get_y(1, 0, x, xp)
-    assert xp[0] > y + 1, "No admin fee to withdraw"
-
-    dy: uint256 = (xp[0] - y - 1) * PRECISION / rates[0]
+    # admin fee
+    if cERC20(self.c_tokens[1]).balanceOf(self) * cERC20(self.c_tokens[1]).exchangeRateStored() / PRECISION > self.balances[1]:
+        dx: uint256 = cERC20(self.c_tokens[1]).balanceOf(self) * cERC20(self.c_tokens[1]).exchangeRateStored() / PRECISION - self.balances[1]
+        rates: uint256[N_COINS] = RATES
+        xp: uint256[N_COINS] = self._xp()
+        x: uint256 = xp[1] + (dx * rates[1] / PRECISION)
+        y: uint256 = self.get_y(1, 0, x, xp)
+        if xp[0] > y + 1:
+            dy: uint256 = (xp[0] - y - 1) * PRECISION / rates[0]
+            self.balances[0] -= dy
+            self.balances[1] += dx
     
-    # write
-    self.balances[0] -= dy
-    self.balances[1] += dx
-    redeem_amount: uint256 = cERC20(self.c_tokens[0]).balanceOf(self) * cERC20(self.c_tokens[0]).exchangeRateStored() / PRECISION - self.balances[0]
-    cERC20(self.c_tokens[0]).redeemUnderlying(redeem_amount)
+    if cERC20(self.c_tokens[0]).balanceOf(self) * cERC20(self.c_tokens[0]).exchangeRateStored() / PRECISION > self.balances[0] :
+        redeem_amount: uint256 = cERC20(self.c_tokens[0]).balanceOf(self) * cERC20(self.c_tokens[0]).exchangeRateStored() / PRECISION - self.balances[0]
+        cERC20(self.c_tokens[0]).redeemUnderlying(redeem_amount)
 
     husd_balance: uint256 = ERC20(self.coins[0]).balanceOf(self)
+    if husd_balance == 0:
+        return
     ERC20(self.coins[0]).approve(self.dao, husd_balance)
     DAO(self.dao).donateHUSD(husd_balance)
 
