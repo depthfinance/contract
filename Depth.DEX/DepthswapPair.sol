@@ -173,11 +173,13 @@ contract DepthswapPair is IDepthswapPair, DepthswapERC20 {
             uint balance1Adjusted = balance1.mul(1000).sub(amount1In.mul(3));
             require(balance0Adjusted.mul(balance1Adjusted) >= uint(_reserve0).mul(_reserve1).mul(1000**2), 'DepthSwap: K');
             address feeTo = IDepthswapFactory(factory).feeTo();
-            if (amount0In>0){
-                _safeTransfer(token0, feeTo, amount0In.mul(3).div(1000));
-            }
-            if (amount1In>0){
-                _safeTransfer(token1, feeTo, amount1In.mul(3).div(1000));
+            if (feeTo != address(0)) {
+                if (amount0In>0){
+                    _safeTransfer(token0, feeTo, amount0In.mul(3).div(1000));
+                }
+                if (amount1In>0){
+                    _safeTransfer(token1, feeTo, amount1In.mul(3).div(1000));
+                }
             }
         }
         balance0 = IERC20(token0).balanceOf(address(this));
