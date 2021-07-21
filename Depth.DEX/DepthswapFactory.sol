@@ -10,7 +10,7 @@ contract DepthswapFactory is IDepthswapFactory {
     bytes32 public initCodeHash;
 
     bool public allowAllOn;
-    mapping(address => bool) whiteList;
+    mapping(address => bool) public whiteList;
 
     mapping(address => mapping(address => address)) public getPair;
     address[] public allPairs;
