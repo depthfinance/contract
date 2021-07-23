@@ -15,8 +15,6 @@ contract DepthswapFactory is IDepthswapFactory {
     }
     FeeInfo[] public feeInfo;
     uint256 public constant FEE_RATE_DENOMINATOR = 10000;
-    uint256 public constant FEE_DIVISOR = 100000;
-    uint256 public feeRateNumerator = 30;
     address public xdepAddress = 0xDeEfD50FE964Cd03694EF7AbFB4147Cb1dd41c9B;
 
     bool public allowAllOn;
@@ -84,12 +82,6 @@ contract DepthswapFactory is IDepthswapFactory {
         allowAllOn = _bvalue;
     }
 
-    function setFeeRateNumerator(uint256 _feeRateNumerator) public {
-        require(msg.sender == feeToSetter, 'DepthSwapFactory: FORBIDDEN');
-        require(_feeRateNumerator >= 0 && _feeRateNumerator <= 50, "DepthSwapFactory: EXCEEDS_FEE_RATE_DENOMINATOR");
-        feeRateNumerator = _feeRateNumerator;
-    }
-
     // set stake token address
     function setXdepAddress(address _address) public {
         require(msg.sender == feeToSetter, 'DepthSwapFactory: FORBIDDEN');
@@ -100,7 +92,7 @@ contract DepthswapFactory is IDepthswapFactory {
     function setFeeRate(uint256 index, uint256 stakeAmount, uint256 rate) public {
         require(msg.sender == feeToSetter, 'DepthSwapFactory: FORBIDDEN');
         // Ensure the fee is less than divisor
-        require(rate < FEE_DIVISOR, "INVALID_FEE");
+        require(rate < FEE_RATE_DENOMINATOR, "INVALID_FEE");
         uint256 len = feeInfo.length;
         require(index <= len, "INVALID_INDEX");
 
@@ -129,6 +121,7 @@ contract DepthswapFactory is IDepthswapFactory {
                 lastAmount = feeInfo[i].stakeAmount;
             }
         }
+
         return feeRate;
     }
 }

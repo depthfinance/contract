@@ -19,8 +19,5 @@ interface IDepthswapFactory {
 
     function getFeeRate(address _address) external view returns (uint256);
 
-    function setFeeRateNumerator(uint256) external;
-
     function FEE_RATE_DENOMINATOR() external view returns (uint256);
-    function feeRateNumerator() external view returns (uint256);
 }

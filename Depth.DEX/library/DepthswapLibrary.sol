@@ -49,10 +49,6 @@ library DepthswapLibrary {
         uint256 fee = IDepthswapFactory(factory).getFeeRate(msg.sender);
         require(fee >=0 && fee <=50, "INVALID_FEE");
 
-        if (fee == 0) {
-            fee = IDepthswapFactory(factory).feeRateNumerator();
-        }
-
         uint amountInWithFee = amountIn.mul(FEE_RATE_DENOMINATOR.sub(fee));
         uint numerator = amountInWithFee.mul(reserveOut);
         uint denominator = reserveIn.mul(FEE_RATE_DENOMINATOR).add(amountInWithFee);
@@ -66,10 +62,6 @@ library DepthswapLibrary {
 
         uint256 fee = IDepthswapFactory(factory).getFeeRate(msg.sender);
         require(fee >=0 && fee <=50, "INVALID_FEE");
-
-        if (fee == 0) {
-            fee = IDepthswapFactory(factory).feeRateNumerator();
-        }
 
         uint numerator = reserveIn.mul(amountOut).mul(FEE_RATE_DENOMINATOR);
         uint denominator = reserveOut.sub(amountOut).mul(FEE_RATE_DENOMINATOR.sub(fee));
