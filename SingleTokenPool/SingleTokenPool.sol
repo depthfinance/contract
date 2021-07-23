@@ -104,7 +104,7 @@ contract SingleTokenPool is Ownable,Pausable {
     function pendingReward(address _address) public view returns(uint256){
         UserInfo memory _user= userInfo[_address];
         uint256 currentTime = block.timestamp;
-        if (currentTime<=startTime){
+        if (currentTime<=startTime||startTime==0||endTime==0){
             return 0;
         }
         uint256 _endTime = currentTime>endTime?endTime:currentTime;
@@ -114,6 +114,9 @@ contract SingleTokenPool is Ownable,Pausable {
     }
 
     function getRewardPerTime() public view returns(uint256){
+        if (endTime==0){
+            return 0;
+        }
         return totalReward.mul(10**12).div(endTime.sub(startTime));
     }
     function updatePool() public{
