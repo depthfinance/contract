@@ -9,6 +9,16 @@ contract DepthswapFactory is IDepthswapFactory {
     address public feeToSetter;
     bytes32 public initCodeHash;
 
+    struct FeeInfo{
+        uint256 stakeAmount;
+        uint256 feeRate;
+    }
+    FeeInfo[] public feeInfo;
+    uint256 public constant FEE_RATE_DENOMINATOR = 10000;
+    uint256 public constant FEE_DIVISOR = 100000;
+    uint256 public feeRateNumerator = 30;
+    address public xdepAddress = 0xDeEfD50FE964Cd03694EF7AbFB4147Cb1dd41c9B;
+
     bool public allowAllOn;
     mapping(address => bool) public whiteList;
 
@@ -74,4 +84,51 @@ contract DepthswapFactory is IDepthswapFactory {
         allowAllOn = _bvalue;
     }
 
+    function setFeeRateNumerator(uint256 _feeRateNumerator) public {
+        require(msg.sender == feeToSetter, 'DepthSwapFactory: FORBIDDEN');
+        require(_feeRateNumerator >= 0 && _feeRateNumerator <= 50, "DepthSwapFactory: EXCEEDS_FEE_RATE_DENOMINATOR");
+        feeRateNumerator = _feeRateNumerator;
+    }
+
+    // set stake token address
+    function setXdepAddress(address _address) public {
+        require(msg.sender == feeToSetter, 'DepthSwapFactory: FORBIDDEN');
+        xdepAddress = _address;
+    }
+
+    //set fee feeRate
+    function setFeeRate(uint256 index, uint256 stakeAmount, uint256 rate) public {
+        require(msg.sender == feeToSetter, 'DepthSwapFactory: FORBIDDEN');
+        // Ensure the fee is less than divisor
+        require(rate < FEE_DIVISOR, "INVALID_FEE");
+        uint256 len = feeInfo.length;
+        require(index <= len, "INVALID_INDEX");
+
+        FeeInfo memory _new = FeeInfo({
+        stakeAmount : stakeAmount,
+        feeRate : rate
+        });
+        if (len==0||index==len){
+            feeInfo.push(_new);
+        }else{
+            feeInfo[index] = _new;
+        }
+    }
+
+    //return address swap fee
+    function getFeeRate(address _address) public view returns (uint256){
+        require(_address != address(0), "INVALID_ADDRESS");
+        uint256 balance = IERC20(xdepAddress).balanceOf(_address);
+        //loop the fee rate array
+        uint256 lastAmount = 0;
+        uint256 feeRate = 0;
+        uint256 stakeTokenDecimal = IERC20(xdepAddress).decimals();
+        for(uint i = 0; i < feeInfo.length; i++) {
+            if (balance>=feeInfo[i].stakeAmount.mul(stakeTokenDecimal)&&(lastAmount==0||feeInfo[i].stakeAmount>lastAmount)){
+                feeRate = feeInfo[i].feeRate;
+                lastAmount = feeInfo[i].stakeAmount;
+            }
+        }
+        return feeRate;
+    }
 }

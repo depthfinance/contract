@@ -347,7 +347,7 @@ contract DepthswapRouter is IDepthswapRouter {
                 (uint reserve0, uint reserve1,) = pair.getReserves();
                 (uint reserveInput, uint reserveOutput) = input == token0 ? (reserve0, reserve1) : (reserve1, reserve0);
                 amountInput = IERC20(input).balanceOf(address(pair)).sub(reserveInput);
-                amountOutput = DepthswapLibrary.getAmountOut(amountInput, reserveInput, reserveOutput);
+                amountOutput = DepthswapLibrary.getAmountOut(factory, amountInput, reserveInput, reserveOutput);
             }
             (uint amount0Out, uint amount1Out) = input == token0 ? (uint(0), amountOutput) : (amountOutput, uint(0));
             address to = i < path.length - 2 ? DepthswapLibrary.pairFor(factory, output, path[i + 2]) : _to;
@@ -421,23 +421,23 @@ contract DepthswapRouter is IDepthswapRouter {
     }
 
     // **** LIBRARY FUNCTIONS ****
-    function quote(uint amountA, uint reserveA, uint reserveB) public pure virtual override returns (uint amountB) {
+    function quote(uint amountA, uint reserveA, uint reserveB) public view virtual override returns (uint amountB) {
         return DepthswapLibrary.quote(amountA, reserveA, reserveB);
     }
 
-    function getAmountOut(uint amountIn, uint reserveIn, uint reserveOut) public pure virtual override returns (uint amountOut) {
-        return DepthswapLibrary.getAmountOut(amountIn, reserveIn, reserveOut);
+    function getAmountOut(uint amountIn, uint reserveIn, uint reserveOut) public virtual override returns (uint amountOut) {
+        return DepthswapLibrary.getAmountOut(factory, amountIn, reserveIn, reserveOut);
     }
 
-    function getAmountIn(uint amountOut, uint reserveIn, uint reserveOut) public pure virtual override returns (uint amountIn) {
-        return DepthswapLibrary.getAmountIn(amountOut, reserveIn, reserveOut);
+    function getAmountIn(uint amountOut, uint reserveIn, uint reserveOut) public virtual override returns (uint amountIn) {
+        return DepthswapLibrary.getAmountIn(factory, amountOut, reserveIn, reserveOut);
     }
 
-    function getAmountsOut(uint amountIn, address[] memory path) public view virtual override returns (uint[] memory amounts) {
+    function getAmountsOut(uint amountIn, address[] memory path) public  virtual override returns (uint[] memory amounts) {
         return DepthswapLibrary.getAmountsOut(factory, amountIn, path);
     }
 
-    function getAmountsIn(uint amountOut, address[] memory path) public view virtual override returns (uint[] memory amounts) {
+    function getAmountsIn(uint amountOut, address[] memory path) public virtual override returns (uint[] memory amounts) {
         return DepthswapLibrary.getAmountsIn(factory, amountOut, path);
     }
 

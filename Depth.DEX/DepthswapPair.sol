@@ -169,16 +169,23 @@ contract DepthswapPair is IDepthswapPair, DepthswapERC20 {
         require(amount0In > 0 || amount1In > 0, 'DepthSwap: INSUFFICIENT_INPUT_AMOUNT');
         { // scope for reserve{0,1}Adjusted, avoids stack too deep errors
 
-            uint balance0Adjusted = balance0.mul(1000).sub(amount0In.mul(3));
-            uint balance1Adjusted = balance1.mul(1000).sub(amount1In.mul(3));
+            uint256 fee = IDepthswapFactory(factory).getFeeRate(msg.sender);
+            require(fee >=0 && fee <=50, "INVALID_FEE");
+
+            if (fee == 0) {
+                fee = IDepthswapFactory(factory).feeRateNumerator();
+            }
+
+            uint balance0Adjusted = balance0.mul(IDepthswapFactory(factory).FEE_RATE_DENOMINATOR()).sub(amount0In.mul(fee));
+            uint balance1Adjusted = balance1.mul(IDepthswapFactory(factory).FEE_RATE_DENOMINATOR()).sub(amount1In.mul(fee));
             require(balance0Adjusted.mul(balance1Adjusted) >= uint(_reserve0).mul(_reserve1).mul(1000**2), 'DepthSwap: K');
             address feeTo = IDepthswapFactory(factory).feeTo();
-            if (feeTo != address(0)) {
+            if (feeTo != address(0) && fee > 0) {
                 if (amount0In>0){
-                    _safeTransfer(token0, feeTo, amount0In.mul(3).div(1000));
+                    _safeTransfer(token0, feeTo, amount0In.mul(fee).div(IDepthswapFactory(factory).FEE_RATE_DENOMINATOR()));
                 }
                 if (amount1In>0){
-                    _safeTransfer(token1, feeTo, amount1In.mul(3).div(1000));
+                    _safeTransfer(token1, feeTo, amount1In.mul(fee).div(IDepthswapFactory(factory).FEE_RATE_DENOMINATOR()));
                 }
             }
         }
