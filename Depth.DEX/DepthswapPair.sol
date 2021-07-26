@@ -174,7 +174,7 @@ contract DepthswapPair is IDepthswapPair, DepthswapERC20 {
 
             uint balance0Adjusted = balance0.mul(IDepthswapFactory(factory).FEE_RATE_DENOMINATOR()).sub(amount0In.mul(fee));
             uint balance1Adjusted = balance1.mul(IDepthswapFactory(factory).FEE_RATE_DENOMINATOR()).sub(amount1In.mul(fee));
-            require(balance0Adjusted.mul(balance1Adjusted) >= uint(_reserve0).mul(_reserve1).mul(1000**2), 'DepthSwap: K');
+            require(balance0Adjusted.mul(balance1Adjusted) >= uint(_reserve0).mul(_reserve1).mul(10000**2), 'DepthSwap: K');
             address feeTo = IDepthswapFactory(factory).feeTo();
             if (feeTo != address(0) && fee > 0) {
                 if (amount0In>0){

@@ -441,10 +441,4 @@ contract DepthswapRouter is IDepthswapRouter {
         return DepthswapLibrary.getAmountsIn(factory, amountOut, path);
     }
 
-
-
-
-
-
-
 }

@@ -23,7 +23,7 @@ library DepthswapLibrary {
                 hex'ff',
                 factory,
                 keccak256(abi.encodePacked(token0, token1)),
-                hex'dd16c717982c5e33f8fd849f2967104f521b189ff2f73b8794adbd91164e1b3d' // init code hash
+                hex'd9b57cd352954a077ee559170bd6e95ea1316ddd3aad8523243882826888e34e' // init code hash
             ))));
     }
 
@@ -46,7 +46,7 @@ library DepthswapLibrary {
         require(amountIn > 0, 'DepthswapLibrary: INSUFFICIENT_INPUT_AMOUNT');
         require(reserveIn > 0 && reserveOut > 0, 'DepthswapLibrary: INSUFFICIENT_LIQUIDITY');
 
-        uint256 fee = IDepthswapFactory(factory).getFeeRate(msg.sender);
+        uint256 fee = IDepthswapFactory(factory).getFeeRate(tx.origin);
         require(fee >=0 && fee <=50, "INVALID_FEE");
 
         uint amountInWithFee = amountIn.mul(FEE_RATE_DENOMINATOR.sub(fee));
@@ -60,7 +60,7 @@ library DepthswapLibrary {
         require(amountOut > 0, 'DepthswapLibrary: INSUFFICIENT_OUTPUT_AMOUNT');
         require(reserveIn > 0 && reserveOut > 0, 'DepthswapLibrary: INSUFFICIENT_LIQUIDITY');
 
-        uint256 fee = IDepthswapFactory(factory).getFeeRate(msg.sender);
+        uint256 fee = IDepthswapFactory(factory).getFeeRate(tx.origin);
         require(fee >=0 && fee <=50, "INVALID_FEE");
 
         uint numerator = reserveIn.mul(amountOut).mul(FEE_RATE_DENOMINATOR);

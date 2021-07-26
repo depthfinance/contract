@@ -15,6 +15,7 @@ contract DepthswapFactory is IDepthswapFactory {
     }
     FeeInfo[] public feeInfo;
     uint256 public constant FEE_RATE_DENOMINATOR = 10000;
+    uint256 public feeRateNumerator = 30;
     address public xdepAddress = 0xDeEfD50FE964Cd03694EF7AbFB4147Cb1dd41c9B;
 
     bool public allowAllOn;
@@ -92,7 +93,7 @@ contract DepthswapFactory is IDepthswapFactory {
     function setFeeRate(uint256 index, uint256 stakeAmount, uint256 rate) public {
         require(msg.sender == feeToSetter, 'DepthSwapFactory: FORBIDDEN');
         // Ensure the fee is less than divisor
-        require(rate < FEE_RATE_DENOMINATOR, "INVALID_FEE");
+        require(rate <= 50, "INVALID_FEE");
         uint256 len = feeInfo.length;
         require(index <= len, "INVALID_INDEX");
 
@@ -105,6 +106,13 @@ contract DepthswapFactory is IDepthswapFactory {
         }else{
             feeInfo[index] = _new;
         }
+    }
+
+    // Set default fee ，max is 0.003%
+    function setFeeRateNumerator(uint256 _feeRateNumerator) public {
+        require(msg.sender == feeToSetter, 'MdexSwapFactory: FORBIDDEN');
+        require(_feeRateNumerator <= 50, "MdexSwapFactory: EXCEEDS_FEE_RATE_DENOMINATOR");
+        feeRateNumerator = _feeRateNumerator;
     }
 
     //return address swap fee
@@ -120,6 +128,10 @@ contract DepthswapFactory is IDepthswapFactory {
                 feeRate = feeInfo[i].feeRate;
                 lastAmount = feeInfo[i].stakeAmount;
             }
+        }
+
+        if (feeRate == 0) {
+            return feeRateNumerator;
         }
 
         return feeRate;
