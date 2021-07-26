@@ -90,16 +90,27 @@ contract SingleTokenPool is Ownable,Pausable {
         UserInfo storage _user= userInfo[msg.sender];
         uint256 _pending = _user.lockAmount.mul(rewardPerLock).div(10**12).sub(_user.rewardDebt);
         uint256 _reward = _user.pendingReward.add(_pending);
-
+        if (_user.lockAmount>0){
+            IERC20(lockToken).safeTransfer(msg.sender,_user.lockAmount);
+        }
         if (_reward>0){
             uint256 _balance = IERC20(rewardToken).balanceOf(address(this));
             require(_balance>=_reward,"not enough balance!");
             totalClaimedReward = totalClaimedReward.add(_reward);
             totalClaimedLock = totalClaimedLock.add(_user.lockAmount);
 
-            delete userInfo[msg.sender];
+
         }
+        delete userInfo[msg.sender];
         IERC20(rewardToken).safeTransfer(msg.sender,_reward);
+    }
+
+    function emergencyWithdraw() external{
+        require(currentTime > endTime,"The activity is not over");
+        UserInfo storage _user= userInfo[msg.sender];
+        require(_user.lockAmount>0,"haven't stake!");
+        IERC20(lockToken).safeTransfer(msg.sender,_user.lockAmount);
+        delete userInfo[msg.sender];
     }
     function pendingReward(address _address) public view returns(uint256){
         UserInfo memory _user= userInfo[_address];
