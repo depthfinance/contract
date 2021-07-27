@@ -121,17 +121,13 @@ contract DepthswapFactory is IDepthswapFactory {
         uint256 balance = IERC20(xdepAddress).balanceOf(_address);
         //loop the fee rate array
         uint256 lastAmount = 0;
-        uint256 feeRate = 0;
+        uint256 feeRate = feeRateNumerator;
         uint256 stakeTokenDecimal = IERC20(xdepAddress).decimals();
         for(uint i = 0; i < feeInfo.length; i++) {
             if (balance>=feeInfo[i].stakeAmount.mul(stakeTokenDecimal)&&(lastAmount==0||feeInfo[i].stakeAmount>lastAmount)){
                 feeRate = feeInfo[i].feeRate;
                 lastAmount = feeInfo[i].stakeAmount;
             }
-        }
-
-        if (feeRate == 0) {
-            return feeRateNumerator;
         }
 
         return feeRate;
