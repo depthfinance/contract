@@ -106,6 +106,7 @@ contract SingleTokenPool is Ownable,Pausable {
     }
 
     function emergencyWithdraw() external{
+        uint256 currentTime = block.timestamp;
         require(currentTime > endTime,"The activity is not over");
         UserInfo storage _user= userInfo[msg.sender];
         require(_user.lockAmount>0,"haven't stake!");
@@ -142,6 +143,6 @@ contract SingleTokenPool is Ownable,Pausable {
         uint256 _endTime = currentTime>endTime?endTime:currentTime;
         uint256 _totalTimes = _endTime.sub(lastRewardTime);
         rewardPerLock =rewardPerLock.add(getRewardPerTime().mul(_totalTimes).div(totalLockAmount));
-        lastRewardTime = currentTime;
+        lastRewardTime = _endTime;
     }
 }
