@@ -141,7 +141,7 @@ contract SingleTokenPool is Ownable,Pausable {
         }
         uint256 _endTime = currentTime>endTime?endTime:currentTime;
         uint256 _totalTimes = _endTime.sub(lastRewardTime);
-        rewardPerLock =rewardPerLock.add(getRewardPerTime().mul(_totalTimes).div(totalReward));
+        rewardPerLock =rewardPerLock.add(getRewardPerTime().mul(_totalTimes).div(totalLockAmount));
         lastRewardTime = currentTime;
     }
 }
