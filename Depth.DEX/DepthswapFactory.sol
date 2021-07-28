@@ -16,7 +16,7 @@ contract DepthswapFactory is IDepthswapFactory {
     FeeInfo[] public feeInfo;
     uint256 public constant FEE_RATE_DENOMINATOR = 10000;
     uint256 public feeRateNumerator = 30;
-    address public xdepAddress = 0xDeEfD50FE964Cd03694EF7AbFB4147Cb1dd41c9B;
+    address public constant xdepAddress = 0xDeEfD50FE964Cd03694EF7AbFB4147Cb1dd41c9B;
 
     bool public allowAllOn;
     mapping(address => bool) public whiteList;
@@ -83,12 +83,6 @@ contract DepthswapFactory is IDepthswapFactory {
         allowAllOn = _bvalue;
     }
 
-    // set stake token address
-    function setXdepAddress(address _address) public {
-        require(msg.sender == feeToSetter, 'DepthSwapFactory: FORBIDDEN');
-        xdepAddress = _address;
-    }
-
     //set fee feeRate
     function setFeeRate(uint256 index, uint256 stakeAmount, uint256 rate) public {
         require(msg.sender == feeToSetter, 'DepthSwapFactory: FORBIDDEN');
@@ -122,9 +116,8 @@ contract DepthswapFactory is IDepthswapFactory {
         //loop the fee rate array
         uint256 lastAmount = 0;
         uint256 feeRate = feeRateNumerator;
-        uint256 stakeTokenDecimal = IERC20(xdepAddress).decimals();
         for(uint i = 0; i < feeInfo.length; i++) {
-            if (balance>=feeInfo[i].stakeAmount.mul(stakeTokenDecimal)&&(lastAmount==0||feeInfo[i].stakeAmount>lastAmount)){
+            if (balance>=feeInfo[i].stakeAmount&&feeInfo[i].stakeAmount>lastAmount){
                 feeRate = feeInfo[i].feeRate;
                 lastAmount = feeInfo[i].stakeAmount;
             }
