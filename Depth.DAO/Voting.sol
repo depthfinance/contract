@@ -124,7 +124,7 @@ contract Voting is Ownable{
     require(votingInProcess(), "No voting in process");
     require(!_hasVotesToWithdraw(msg.sender), "Previous votes not withdrawed");
     VotingInfo storage info = votingInfoMap[lastIndex];
-    require(info.voteOptionsCount - 1 > index, "Out of options");
+    require(info.voteOptionsCount - 1 >= index, "Out of options");
     
     // update
     UserVoting storage userVoting = userVotingMap[msg.sender];
@@ -142,7 +142,7 @@ contract Voting is Ownable{
     require(period <= maxPeriod, "Maximum period exceeded");
     require(period > 0, "Period must be larger than 0");
     require(!votingInProcess(), "There is a pending voting");
-    require(optionsCount >= 2, "At least two options are needed");
+    require(optionsCount >= 1, "At least one options are needed");
     require(voteTitles.length == optionsCount, "Inconsistence");
     
     lastIndex += 1;
