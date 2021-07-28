@@ -1,4 +1,5 @@
 pragma solidity 0.6.12;
+pragma experimental ABIEncoderV2;
 
 interface ERC20 {
 
@@ -64,8 +65,10 @@ contract Voting is Ownable{
   struct VotingInfo {
     uint256 startsAt;
     uint256 period;
-    uint16 voteOptionsCount;
+    string title;
     string description;
+    uint16 voteOptionsCount;
+    string[] voteTitles;
     mapping (uint256 => uint256) votes;
   }
 
@@ -89,14 +92,18 @@ contract Voting is Ownable{
       xDep = ERC20(tokenAddress);
   }
 
+  function _hasVotesToWithdraw(address user) private view returns (bool) {
+    UserVoting memory userVoting = userVotingMap[user];
+    return userVoting.index > 0 && (userVoting.index != lastIndex || !votingInProcess());
+  }
+  
   function votingInProcess() public view returns (bool) {
     VotingInfo memory info = votingInfoMap[lastIndex];
     return info.startsAt + info.period > now;
   }
-
-  function _hasVotesToWithdraw(address user) private view returns (bool) {
-    UserVoting memory userVoting = userVotingMap[user];
-    return userVoting.index > 0 && (userVoting.index != lastIndex || !votingInProcess());
+  
+  function voteCountForOption(address user, uint16 optionNo) public view returns (uint256) {
+    return userVotingMap[user].votes[optionNo];
   }
 
   function withdrawPreviousVote() public {
@@ -105,8 +112,8 @@ contract Voting is Ownable{
     UserVoting storage userVoting = userVotingMap[msg.sender];
     uint256 totalVotes = 0;
     for (uint16 i = 0; i < userVoting.voteOptionsCount; i ++) {
-      userVoting.votes[i] = 0;
       totalVotes += userVoting.votes[i];
+      userVoting.votes[i] = 0;
     } 
     xDep.transfer(msg.sender, totalVotes);
     userVotingMap[msg.sender] = UserVoting(0, 0);
@@ -131,12 +138,15 @@ contract Voting is Ownable{
     
   }
 
-  function startNewVoting(string memory description, uint256 period, uint16 optionsCount) public onlyOwner {
+  function startNewVoting(uint256 period, string memory title, string memory description, string[] memory voteTitles, uint16 optionsCount) public onlyOwner {
     require(period <= maxPeriod, "Maximum period exceeded");
+    require(period > 0, "Period must be larger than 0");
     require(!votingInProcess(), "There is a pending voting");
+    require(optionsCount >= 2, "At least two options are needed");
+    require(voteTitles.length == optionsCount, "Inconsistence");
     
     lastIndex += 1;
-    VotingInfo memory info = VotingInfo(now, period, optionsCount, description);
+    VotingInfo memory info = VotingInfo(now, period, title, description, optionsCount, voteTitles);
     votingInfoMap[lastIndex] = info;
   }
 
