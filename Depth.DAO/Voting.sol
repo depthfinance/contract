@@ -1,6 +1,8 @@
 pragma solidity 0.6.12;
 pragma experimental ABIEncoderV2;
 
+
+
 interface ERC20 {
 
     function totalSupply() external view returns (uint256);
@@ -14,8 +16,12 @@ interface ERC20 {
     function approve(address spender, uint256 value) external returns (bool);
 
     function transferFrom(address from, address to, uint256 value) external returns (bool);
+    
+    
 
 }
+
+
 
 abstract contract Context {
     function _msgSender() internal view virtual returns (address payable) {
@@ -62,6 +68,8 @@ contract Ownable is Context {
 
 contract Voting is Ownable{
     
+  event Vote(address indexed user, uint256 indexed index, uint16 option, uint256 votes);
+    
   struct VotingInfo {
     uint256 startsAt;
     uint256 period;
@@ -84,7 +92,7 @@ contract Voting is Ownable{
   
   uint256 constant private maxPeriod = 5 minutes;
   
-  uint256 private lastIndex = 0; 
+  uint256 public lastIndex = 0; 
 
   ERC20 private xDep;
   
@@ -92,7 +100,7 @@ contract Voting is Ownable{
       xDep = ERC20(tokenAddress);
   }
 
-  function _hasVotesToWithdraw(address user) private view returns (bool) {
+  function hasVotesToWithdraw(address user) public view returns (bool) {
     UserVoting memory userVoting = userVotingMap[user];
     return userVoting.index > 0 && (userVoting.index != lastIndex || !votingInProcess());
   }
@@ -102,12 +110,20 @@ contract Voting is Ownable{
     return info.startsAt + info.period > now;
   }
   
-  function voteCountForOption(address user, uint16 optionNo) public view returns (uint256) {
-    return userVotingMap[user].votes[optionNo];
+  function userVoteCountForOption(address user, uint16 option) public view returns (uint256) {
+    return userVotingMap[user].votes[option];
+  }
+  
+  function voteCountForOption(uint256 round, uint16 option) public view returns (uint256) {
+    return votingInfoMap[round].votes[option];
+  }
+  
+  function voteTitleForOption(uint256 round, uint16 option) public view returns (string memory) {
+    return votingInfoMap[round].voteTitles[option];
   }
 
   function withdrawPreviousVote() public {
-    require(_hasVotesToWithdraw(msg.sender), "No votes to withdraw");
+    require(hasVotesToWithdraw(msg.sender), "No votes to withdraw");
     
     UserVoting storage userVoting = userVotingMap[msg.sender];
     uint256 totalVotes = 0;
@@ -122,7 +138,7 @@ contract Voting is Ownable{
   function vote(uint16 index, uint256 votes) public {
     // validation
     require(votingInProcess(), "No voting in process");
-    require(!_hasVotesToWithdraw(msg.sender), "Previous votes not withdrawed");
+    require(!hasVotesToWithdraw(msg.sender), "Previous votes not withdrawed");
     VotingInfo storage info = votingInfoMap[lastIndex];
     require(info.voteOptionsCount - 1 >= index, "Out of options");
     
@@ -136,6 +152,7 @@ contract Voting is Ownable{
     userVoting.votes[index] += votes;
     info.votes[index] += votes;
     
+    emit Vote(msg.sender, lastIndex, index, votes);
   }
 
   function startNewVoting(uint256 period, string memory title, string memory description, string[] memory voteTitles, uint16 optionsCount) public onlyOwner {
@@ -149,5 +166,5 @@ contract Voting is Ownable{
     VotingInfo memory info = VotingInfo(now, period, title, description, optionsCount, voteTitles);
     votingInfoMap[lastIndex] = info;
   }
-
+  
 }
