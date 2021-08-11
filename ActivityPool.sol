@@ -144,7 +144,7 @@ contract ActivityPool is Ownable,Pausable {
             return 0;
         }
         uint256 _endTime = currentTime>endTime?endTime:currentTime;
-        uint256 _totalTimes = _endTime.sub(startTime);
+        uint256 _totalTimes = _endTime.sub(lastRewardTime);
         uint256 _rewardPerLock =rewardPerLock.add(getRewardPerTime().mul(_totalTimes).div(totalLockAmount));
         return _user.lockAmount.mul(_rewardPerLock).div(10**12).sub(_user.rewardDebt);
     }
