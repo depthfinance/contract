@@ -99,7 +99,7 @@ contract ActivityPool is Ownable,Pausable {
         uint256 _balance = IERC20(rewardToken).balanceOf(address(this));
         require(_balance>=_reward,"not enough balance!");
         IERC20(rewardToken).transfer(msg.sender,_reward);
-        totalClaimedReward = totalClaimedReward.add(_pending);
+        totalClaimedReward = totalClaimedReward.add(_reward);
     }
     function unLock(uint256 _amount) external{
         updatePool();
