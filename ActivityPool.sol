@@ -24,15 +24,15 @@ contract ActivityPool is Ownable,Pausable {
         uint256 rewardDebt;
     }
     event Lock(
-        address user,
+        address indexed user,
         uint256 amount
     );
     event UnLock(
-        address user,
+        address indexed user,
         uint256 amount
     );
     event Claim(
-        address user
+        address indexed user
     );
     constructor (address _lockToken, address _rewardToken,uint256 _lockLimitAmount,uint256 _totalReward,uint256 _startTime,uint256 _lockDays) {
 
@@ -99,8 +99,9 @@ contract ActivityPool is Ownable,Pausable {
         uint256 _balance = IERC20(rewardToken).balanceOf(address(this));
         require(_balance>=_reward,"not enough balance!");
         IERC20(rewardToken).transfer(msg.sender,_reward);
+        totalClaimedReward = totalClaimedReward.add(_pending);
     }
-    function unLock(uint256 _amount) external whenNotPaused{
+    function unLock(uint256 _amount) external{
         updatePool();
         //uint256 currentTime = block.timestamp;
         //require(currentTime > endTime,"The activity is not over");
@@ -110,7 +111,7 @@ contract ActivityPool is Ownable,Pausable {
         uint256 _pending = _user.lockAmount.mul(rewardPerLock).div(10**12).sub(_user.rewardDebt);
         if (_pending>0){
             transferReward(_pending);
-            totalClaimedReward = totalClaimedReward.add(_pending);
+
         }
 
         if (_amount>0){
@@ -129,7 +130,7 @@ contract ActivityPool is Ownable,Pausable {
             uint256 _pending = _user.lockAmount.mul(rewardPerLock).div(10**12).sub(_user.rewardDebt);
             if (_pending>0){
                 transferReward(_pending);
-                totalClaimedReward = totalClaimedReward.add(_pending);
+
             }
 
             _user.rewardDebt = _user.lockAmount.mul(rewardPerLock).div(10**12);
