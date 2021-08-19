@@ -71,6 +71,7 @@ contract ActivityPool is Ownable,Pausable {
         if (_lockLimitAmount>0){
             lockLimitAmount = _lockLimitAmount;
         }
+        canUnLockBeforeFinished = _canUnLockBeforeFinished;
     }
     function lock(uint256 _amount) external whenNotPaused{
         uint256 currentTime = block.timestamp;
