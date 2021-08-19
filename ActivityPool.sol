@@ -18,6 +18,7 @@ contract ActivityPool is Ownable,Pausable {
     uint256 public endTime;
     uint256 public lastRewardTime;
     uint256 public rewardPerLock;
+    bool public canUnLockBeforeFinished;
     mapping(address=>UserInfo) public userInfo;
     struct UserInfo{
         uint256 lockAmount;
@@ -34,7 +35,7 @@ contract ActivityPool is Ownable,Pausable {
     event Claim(
         address indexed user
     );
-    constructor (address _lockToken, address _rewardToken,uint256 _lockLimitAmount,uint256 _totalReward,uint256 _startTime,uint256 _lockDays) {
+    constructor (address _lockToken, address _rewardToken,uint256 _lockLimitAmount,uint256 _totalReward,uint256 _startTime,uint256 _lockDays,bool _canUnLockBeforeFinished) {
 
         require(_lockToken != address(0), "invalid lock token");
         require(_rewardToken != address(0), "invalid reward token");
@@ -44,13 +45,14 @@ contract ActivityPool is Ownable,Pausable {
         totalReward = _totalReward;
         startTime = _startTime;
         lastRewardTime = _startTime;
+        canUnLockBeforeFinished = _canUnLockBeforeFinished;
         uint256 currentTime = block.timestamp;
         require(startTime==0||startTime>=currentTime,"start time must over now!");
         if (_lockDays>0&&startTime>0){
             endTime = startTime.add(86400*_lockDays);
         }
     }
-    function setSetting(uint256 _lockLimitAmount,uint256 _totalReward,uint256 _startTime,uint256 _lockDays) external onlyOwner{
+    function setSetting(uint256 _lockLimitAmount,uint256 _totalReward,uint256 _startTime,uint256 _lockDays,bool _canUnLockBeforeFinished) external onlyOwner{
         uint256 currentTime = block.timestamp;
 
         if(_totalReward>0){
@@ -102,9 +104,12 @@ contract ActivityPool is Ownable,Pausable {
         totalClaimedReward = totalClaimedReward.add(_reward);
     }
     function unLock(uint256 _amount) external{
+        if (canUnLockBeforeFinished==false){
+            uint256 currentTime = block.timestamp;
+            require(currentTime > endTime,"The activity is not over");
+        }
         updatePool();
-        //uint256 currentTime = block.timestamp;
-        //require(currentTime > endTime,"The activity is not over");
+
         UserInfo storage _user= userInfo[msg.sender];
         require(_user.lockAmount >= _amount, "not enough lock amount!");
 
