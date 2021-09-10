@@ -123,10 +123,6 @@ future_fee: public(uint256)
 future_admin_fee: public(uint256)
 future_owner: public(address)
 
-is_killed: bool
-kill_deadline: uint256
-KILL_DEADLINE_DT: constant(uint256) = 2 * 30 * 86400
-
 c_tokens: public(address[N_COINS])
 
 lend_plartform_token: public(ERC20)
@@ -168,7 +164,6 @@ def __init__(
     self.fee = _fee
     self.admin_fee = _admin_fee
     self.owner = _owner
-    self.kill_deadline = block.timestamp + KILL_DEADLINE_DT
     self.token = LPToken(_pool_token)
     self.c_tokens = _c_tokens
     self.lend_plartform_token = ERC20(_lend_plartform_token)
@@ -385,9 +380,7 @@ def _donate_dao():
 @external
 @nonreentrant('lock')
 def add_liquidity(amounts: uint256[N_COINS], min_mint_amount: uint256):
-    assert not self.is_killed  # dev: is killed
-    
-    self._donate_dao()
+    # assert not self.is_killed  # dev: is killed
 
     fees: uint256[N_COINS] = empty(uint256[N_COINS])
     _fee: uint256 = self.fee * N_COINS / (4 * (N_COINS - 1))
@@ -489,7 +482,7 @@ def get_dy(i: int128, j: int128, dx: uint256) -> uint256:
 @external
 @nonreentrant('lock')
 def exchange(i: int128, j: int128, dx: uint256, min_dy: uint256):
-    assert not self.is_killed  # dev: is killed
+    # assert not self.is_killed  # dev: is killed
     rates: uint256[N_COINS] = RATES
 
     old_balances: uint256[N_COINS] = self.balances
@@ -566,8 +559,6 @@ def exchange(i: int128, j: int128, dx: uint256, min_dy: uint256):
 @external
 @nonreentrant('lock')
 def remove_liquidity(_amount: uint256, min_amounts: uint256[N_COINS], donate: bool):
-    if donate:
-        self._donate_dao()
 
     total_supply: uint256 = self.token.totalSupply()
     amounts: uint256[N_COINS] = empty(uint256[N_COINS])
@@ -604,10 +595,7 @@ def remove_liquidity(_amount: uint256, min_amounts: uint256[N_COINS], donate: bo
 @external
 @nonreentrant('lock')
 def remove_liquidity_imbalance(amounts: uint256[N_COINS], max_burn_amount: uint256, donate: bool):
-    assert not self.is_killed  # dev: is killed
-
-    if donate:
-        self._donate_dao()
+    # assert not self.is_killed  # dev: is killed
 
     token_supply: uint256 = self.token.totalSupply()
     assert token_supply != 0  # dev: zero total supply
@@ -755,10 +743,8 @@ def remove_liquidity_one_coin(_token_amount: uint256, i: int128, min_amount: uin
     """
     Remove _amount of liquidity all in a form of coin i
     """
-    assert not self.is_killed  # dev: is killed
+    # assert not self.is_killed  # dev: is killed
 
-    if donate:
-        self._donate_dao()
 
     dy: uint256 = 0
     dy_fee: uint256 = 0
@@ -915,12 +901,6 @@ def set_reward_info(new_team_address: address, new_dao: address, new_send_reward
     self.send_reward_to_dao = new_send_reward_to_dao
 
 @external
-def kill_me():
-    assert msg.sender == self.owner  # dev: only owner
-    assert self.kill_deadline > block.timestamp  # dev: deadline has passed
-    self.is_killed = True
-
-@external
-def unkill_me():
-    assert msg.sender == self.owner  # dev: only owner
-    self.is_killed = False
+def set_sell_lend_platform_token(new_sell_lend_plartform_token: address):
+    assert msg.sender == self.owner
+    self.sell_lend_plartform_token = new_sell_lend_plartform_token
