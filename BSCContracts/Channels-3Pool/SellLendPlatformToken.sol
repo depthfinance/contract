@@ -133,24 +133,10 @@ contract SellLendPlatformToken{
     function sell_lending_platform_token(uint256 amount) external returns (bool){
         require(can.transferFrom(msg.sender, address(this), amount));
 
-        address[] memory path1 = new address[](3);
-        path1[0] = address(can);
-        path1[1] = address(wbnb);
-        path1[2] = address(busd);
-        uint256 amount1 = uniswap.getAmountsOut(amount, path1)[2];
-
-        address[] memory path2 = new address[](2);
-        path2[0] = address(can);
-        path2[1] = address(busd);
-        uint256 amount2 = uniswap.getAmountsOut(amount, path2)[1];
-
-        address[] memory path;
-        
-        if (amount1 > amount2) {
-            path = path1;
-        } else {
-            path = path2;
-        }
+        address[] memory path = new address[](3);
+        path[0] = address(can);
+        path[1] = address(wbnb);
+        path[2] = address(busd);
         
         can.approve(address(uniswap), amount);
         try uniswap.swapExactTokensForTokens(amount, 0, path, address(this), now) returns (uint256[] memory amounts) {
