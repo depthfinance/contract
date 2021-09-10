@@ -118,30 +118,19 @@ interface DAOPool {
 
 contract SellLendPlatformToken{
 
-    address internal _mainContractAddress;
-    
-    address public daoAddress;
-
-    UniswapRouter constant uniswap             = UniswapRouter(0x10ED43C718714eb63d5aA57B78B54704E256024E);
-    ERC20      constant can              = ERC20(0xdE9a73272BC2F28189CE3c243e36FaFDA2485212);
-    ERC20      constant busd             = ERC20(0xe9e7CEA3DedcA5984780Bafc599bD69ADd087D56);
-    ERC20      constant wbnb              = ERC20(0xbb4CdB9CBd36B01bD1cBaEBF2De08d9173bc095c);
-    ClaimCan  constant claimCANContract = ClaimCan(0x8Cd2449Ed0469D90a7C4321DF585e7913dd6E715);
-
-    constructor(address mainContractAddress, address _daoAddress) public {
-        _mainContractAddress = mainContractAddress;
-        daoAddress = _daoAddress;
-    }
+    UniswapRouter constant uniswap          = UniswapRouter(0x10ED43C718714eb63d5aA57B78B54704E256024E);
+    ERC20         constant can              = ERC20(0xdE9a73272BC2F28189CE3c243e36FaFDA2485212);
+    ERC20         constant busd             = ERC20(0xe9e7CEA3DedcA5984780Bafc599bD69ADd087D56);
+    ERC20         constant wbnb             = ERC20(0xbb4CdB9CBd36B01bD1cBaEBF2De08d9173bc095c);
+    ClaimCan      constant claimCANContract = ClaimCan(0x8Cd2449Ed0469D90a7C4321DF585e7913dd6E715);
 
     function claim_lending_platform_token() external {
-        assert(msg.sender == _mainContractAddress);
         // This method calim CAN token for main contract.
         // Since this contract is replaceable, we can rewrite this method if we have to.
         claimCANContract.claimCan(msg.sender);
     }
 
     function sell_lending_platform_token(uint256 amount) external returns (bool){
-        assert(msg.sender == _mainContractAddress);
         require(can.transferFrom(msg.sender, address(this), amount));
 
         address[] memory path1 = new address[](3);
@@ -152,7 +141,7 @@ contract SellLendPlatformToken{
 
         address[] memory path2 = new address[](2);
         path2[0] = address(can);
-        path2[2] = address(busd);
+        path2[1] = address(busd);
         uint256 amount2 = uniswap.getAmountsOut(amount, path2)[1];
 
         address[] memory path;
