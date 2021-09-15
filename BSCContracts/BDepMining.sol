@@ -19,7 +19,10 @@ contract BDepMining is Ownable {
         uint256 pendingReward;
         bool unStakeBeforeEnableClaim;
     }
-
+    struct UnlockQueue {
+        uint256 amount;
+        uint256 unlockTimestamp;
+    }
     // Info of each pool.
     struct PoolInfo {
         IERC20 lpToken;           // Address of LP token contract.
@@ -27,7 +30,7 @@ contract BDepMining is Ownable {
         uint256 lastRewardBlock;  // Last block number that DepTokens distribution occurs.
         uint256 accDepPerShare; // Accumulated DepTokens per share, times 1e12. See below.
         uint256 totalDeposit ;      // Accumulated deposit tokens.
-
+        uint256 lockDays;//days to withdraw lp token
     }
 
     // The DepToken !
@@ -61,16 +64,15 @@ contract BDepMining is Ownable {
     mapping(uint256 => mapping(address => UserInfo)) public userInfo;
     mapping(uint256 => address[]) public userAddresses;
     mapping(uint256 => mapping(address => uint)) private userPoolAddresses;
-
+    mapping(uint256=>mapping(address=>UnlockQueue[])) public userUnlockQueues;
     // Total allocation points. Must be the sum of all allocation points in all pools.
     uint256 public totalAllocPoint;
 
     event Stake(address indexed user, uint256 indexed pid, uint256 amount);
     event Claim(address indexed user, uint256 indexed pid);
+    event MaturityWithdraw(address indexed user, uint256 indexed pid,uint256 amount);
     event UnStake(address indexed user, uint256 indexed pid, uint256 amount);
     event EmergencyWithdraw(address indexed user, uint256 indexed pid, uint256 amount);
-    event ReplaceMigrate(address indexed user, uint256 pid, uint256 amount);
-    event Migrate(address indexed user, uint256 pid, uint256 targetPid, uint256 amount);
 
     constructor (
         address _Dep,
@@ -268,7 +270,7 @@ contract BDepMining is Ownable {
 
     // Add a new lp to the pool. Can only be called by the owner.
     // DO NOT add the same LP token more than once. Rewards will be messed up if you do.
-    function add(uint256 _allocPoint, IERC20 _lpToken, bool _withUpdate) public onlyOwner {
+    function add(uint256 _allocPoint, IERC20 _lpToken,uint256 _lockDays, bool _withUpdate) public onlyOwner {
         require(address(_lpToken) != address(0), "lp token is the zero address");
         if (_withUpdate) {
             massUpdatePools();
@@ -285,7 +287,8 @@ contract BDepMining is Ownable {
         allocPoint : _allocPoint,
         lastRewardBlock : lastRewardBlock,
         accDepPerShare : 0,
-        totalDeposit : 0
+        totalDeposit : 0,
+        lockDays :_lockDays
         }));
     }
 
@@ -365,7 +368,14 @@ contract BDepMining is Ownable {
 
         if (_amount > 0) {
             // transfer LP tokens to user
-            pool.lpToken.safeTransfer(address(msg.sender), _amount);
+            if (pool.lockDays>0){
+                userUnlockQueues[_pid][msg.sender].push(UnlockQueue({
+                amount: _amount,
+                unlockTimestamp: block.timestamp
+                }));
+            }else{
+                pool.lpToken.safeTransfer(address(msg.sender), _amount);
+            }
             // update user info
             user.amount = user.amount.sub(_amount);
             pool.totalDeposit = pool.totalDeposit.sub(_amount);
@@ -411,6 +421,7 @@ contract BDepMining is Ownable {
     function emergencyWithdraw(uint256 _pid) public {
 
         PoolInfo storage pool = poolInfo[_pid];
+        require(pool.lockDays==0,"can not emergencyWithdraw");
         UserInfo storage user = userInfo[_pid][msg.sender];
 
         uint256 amount = user.amount;
@@ -426,5 +437,51 @@ contract BDepMining is Ownable {
         emit EmergencyWithdraw(msg.sender, _pid, amount);
     }
 
+    function unlockQueueCount(uint256 _pid,address _address) public view returns (uint256) {
+        return userUnlockQueues[_pid][_address].length;
+    }
 
+
+    function _deleteQueueAt(uint256 _pid,uint256 index) private {
+        UnlockQueue[] storage queues = userUnlockQueues[_pid][msg.sender];
+        for (uint256 i = index; i < queues.length - 1; i++) {
+            queues[i] = queues[i + 1];
+        }
+        queues.pop();
+    }
+
+    function maturityWithdraw(uint256 _pid) public{
+        uint256 lockingLength = poolInfo[_pid].lockDays*86400;
+        UnlockQueue[] storage queues = userUnlockQueues[_pid][msg.sender];
+        uint256 amount = maturityWithdrawAmount(_pid,msg.sender);
+        require(amount != 0, "no available lp token");
+        for (uint256 iPlusOne = queues.length; iPlusOne > 0; iPlusOne--) {
+            uint256 i = iPlusOne - 1;
+            if (block.timestamp - queues[i].unlockTimestamp > lockingLength) {
+                _deleteQueueAt(_pid,i);
+            }
+        }
+        poolInfo[_pid].lpToken.safeTransfer(msg.sender, amount);
+        emit MaturityWithdraw(msg.sender,_pid,amount);
+    }
+
+    function maturityWithdrawAmount(uint256 _pid,address _address) public view returns (uint256) {
+        uint256 lockingLength = poolInfo[_pid].lockDays*86400;
+        UnlockQueue[] memory queues = userUnlockQueues[_pid][_address];
+        uint256 sum = 0;
+        for (uint256 i = 0; i < queues.length; i++) {
+            if (block.timestamp - queues[i].unlockTimestamp > lockingLength) {
+                sum += queues[i].amount;
+            }
+        }
+        return sum;
+    }
+    function unlockingAmount(uint256 _pid,address _address) public view returns (uint256) {
+        UnlockQueue[] memory _queues = userUnlockQueues[_pid][_address];
+        uint256 sum = 0;
+        for (uint256 i = 0; i < _queues.length; i++) {
+            sum += _queues[i].amount;
+        }
+        return sum;
+    }
 }
