@@ -86,9 +86,9 @@ contract dDepVenusVault is ERC20, Ownable, Pausable {
 
         require(_amount>0, "invalid amount");
         require(maxLimit==0 || balance.add(_amount)<=maxLimit, "exceed max deposit limit");
-        IERC20(want).safeTransferFrom(msg.sender, address(this), _amount);
+        IERC20(want).transferFrom(msg.sender, address(this), _amount);
         //deposit token to compound
-        IERC20(want).safeApprove(vTokenAddress, _amount);
+        IERC20(want).approve(vTokenAddress, _amount);
         require(VToken(vTokenAddress).mint(_amount) == 0, "!deposit");
         balance = balance.add(_amount);
         _mint(msg.sender, _amount);
@@ -101,7 +101,7 @@ contract dDepVenusVault is ERC20, Ownable, Pausable {
 
         //redeemUnderlying
         require(VToken(vTokenAddress).redeemUnderlying(_amount) == 0, "!withdraw");
-        IERC20(want).safeTransfer(msg.sender, _amount);
+        IERC20(want).transfer(msg.sender, _amount);
         balance = balance.sub(_amount);
     }
 
@@ -111,7 +111,7 @@ contract dDepVenusVault is ERC20, Ownable, Pausable {
         if (_amount==0){
             return;
         }
-        IERC20(_token).safeApprove(busdSwapAddress, _amount);
+        IERC20(_token).approve(busdSwapAddress, _amount);
         ISwap(busdSwapAddress).swapTokensToEarnToken(_token, _amount);
     }
 
