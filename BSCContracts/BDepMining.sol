@@ -188,8 +188,8 @@ contract BDepMining is Ownable {
         UserInfo storage user = userInfo[_pid][_user];
 
         uint256 accDepPerShare = pool.accDepPerShare;
-        uint256 lpSupply = pool.lpToken.balanceOf(address(this));
-
+        //uint256 lpSupply = pool.lpToken.balanceOf(address(this));
+        uint256 lpSupply = pool.totalDeposit;
         if (block.number > pool.lastRewardBlock && lpSupply != 0) {
             // pending Dep reward
             uint256 DepReward = 0;
@@ -247,7 +247,8 @@ contract BDepMining is Ownable {
             return;
         }
 
-        uint256 lpSupply = pool.lpToken.balanceOf(address(this));
+        //uint256 lpSupply = pool.lpToken.balanceOf(address(this));
+        uint256 lpSupply = pool.totalDeposit;
         if (lpSupply == 0) {
             pool.lastRewardBlock = block.number;
             return;
