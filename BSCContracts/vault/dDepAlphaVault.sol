@@ -99,8 +99,8 @@ contract dDepAlphaVault is ERC20,Ownable,Pausable {
             require(tokenAddress == WBNB, "invalid address");
             require(_amount == msg.value, "_amount != msg.value");
         } else {
-            IERC20(want).safeTransferFrom(msg.sender, address(this), _amount);
-            IERC20(want).safeApprove(ibTokenAddress, _amount); //deposit token to alpha pool
+            IERC20(want).transferFrom(msg.sender, address(this), _amount);
+            IERC20(want).approve(ibTokenAddress, _amount); //deposit token to alpha pool
         }
 
         IAlpha(ibTokenAddress).deposit(_amount);
@@ -119,14 +119,14 @@ contract dDepAlphaVault is ERC20,Ownable,Pausable {
             uint256 totalToken = IAlpha(ibTokenAddress).totalToken();
             uint256 totalSupply = IAlpha(ibTokenAddress).totalSupply();
             uint256 amount = balance.mul(totalToken).div(totalSupply);
-            require(_amount <= amount, "error： invalid amount");
+            require(_amount <= amount, "invalid amount");
             IAlpha(ibTokenAddress).withdraw(_amount);
         } else {
             uint256 _before = IERC20(want).balanceOf(address(this));
             IAlpha(ibTokenAddress).withdraw(_amount);
             uint256 _after = IERC20(want).balanceOf(address(this));
             require(_after.sub(_before)>_amount, "sub flow!");
-            IERC20(want).safeTransfer(msg.sender, _amount);
+            IERC20(want).transfer(msg.sender, _amount);
         }
 
         balance=balance.sub(_amount);
@@ -138,7 +138,7 @@ contract dDepAlphaVault is ERC20,Ownable,Pausable {
         if (_amount==0){
             return;
         }
-        IERC20(_token).safeApprove(busdSwapAddress, _amount);
+        IERC20(_token).approve(busdSwapAddress, _amount);
         ISwap(busdSwapAddress).swapTokensToEarnToken(_token, _amount);
     }
 
@@ -171,7 +171,10 @@ contract dDepAlphaVault is ERC20,Ownable,Pausable {
                 require(_after.sub(_before)>_claimAmount, "sub flow!");
 
             }
-            swapTokensToBusd(want);
+
+            if (want!= busd){
+                swapTokensToBusd(want);
+            }
         }
 
         //donate husd to dao
