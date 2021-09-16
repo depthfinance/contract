@@ -118,7 +118,6 @@ contract dDepAlphaVault is ERC20,Ownable,Pausable {
         uint256 share = _amount.mul(totalSupply).div(totalToken);
 
         if (tokenAddress == WBNB) {
-            require(tokenAddress == WBNB, "invalid address");
             IAlpha(ibTokenAddress).withdraw(share);
             payable(msg.sender).transfer(_amount);
         } else {
@@ -162,13 +161,17 @@ contract dDepAlphaVault is ERC20,Ownable,Pausable {
             uint256 _totalToken = IAlpha(ibTokenAddress).totalToken();
             uint256 _claimAmount = _interest<_totalToken?_interest:_totalToken;
 
+            uint256 totalToken = IAlpha(ibTokenAddress).totalToken();
+            uint256 totalSupply =  IAlpha(ibTokenAddress).totalSupply();
+            uint256 share = _claimAmount.mul(totalSupply).div(totalToken);
+
             if (tokenAddress == WBNB) {
-                IAlpha(ibTokenAddress).withdraw(_claimAmount);
+                IAlpha(ibTokenAddress).withdraw(share);
             } else {
                 uint256 _before = IERC20(want).balanceOf(address(this));
-                IAlpha(ibTokenAddress).withdraw(_claimAmount);
+                IAlpha(ibTokenAddress).withdraw(share);
                 uint256 _after = IERC20(want).balanceOf(address(this));
-                require(_after.sub(_before)>_claimAmount, "sub flow!");
+                require(_after.sub(_before)>=_claimAmount, "sub flow!");
 
             }
 
