@@ -13,7 +13,7 @@ interface IAlpha {
     function totalToken() external view returns (uint256);
     function totalSupply() external view returns (uint256);
 
-    function deposit(uint256 amount) external;
+    function deposit(uint256 amount) payable external;
     function withdraw(uint256 amount) external;
 
     function balanceOf(address) external view returns (uint256);
@@ -103,7 +103,7 @@ contract dDepAlphaVault is ERC20,Ownable,Pausable {
             IERC20(want).approve(ibTokenAddress, _amount); //deposit token to alpha pool
         }
 
-        IAlpha(ibTokenAddress).deposit(_amount);
+        IAlpha(ibTokenAddress).deposit{value: _amount}(_amount);
         balance=balance.add(_amount);
         _mint(msg.sender, _amount);
     }
@@ -113,17 +113,17 @@ contract dDepAlphaVault is ERC20,Ownable,Pausable {
         require(_amount>0, "invalid amount");
         _burn(msg.sender, _amount);
 
+        uint256 totalToken = IAlpha(ibTokenAddress).totalToken();
+        uint256 totalSupply = IAlpha(ibTokenAddress).totalSupply();
+        uint256 share = _amount.mul(totalSupply).div(totalToken);
+
         if (tokenAddress == WBNB) {
             require(tokenAddress == WBNB, "invalid address");
-            uint256 balance = IAlpha(ibTokenAddress).balanceOf(address(this));
-            uint256 totalToken = IAlpha(ibTokenAddress).totalToken();
-            uint256 totalSupply = IAlpha(ibTokenAddress).totalSupply();
-            uint256 amount = balance.mul(totalToken).div(totalSupply);
-            require(_amount <= amount, "invalid amount");
-            IAlpha(ibTokenAddress).withdraw(_amount);
+            IAlpha(ibTokenAddress).withdraw(share);
+            payable(msg.sender).transfer(_amount);
         } else {
             uint256 _before = IERC20(want).balanceOf(address(this));
-            IAlpha(ibTokenAddress).withdraw(_amount);
+            IAlpha(ibTokenAddress).withdraw(share);
             uint256 _after = IERC20(want).balanceOf(address(this));
             require(_after.sub(_before)>_amount, "sub flow!");
             IERC20(want).transfer(msg.sender, _amount);
@@ -195,4 +195,8 @@ contract dDepAlphaVault is ERC20,Ownable,Pausable {
     function decimals() public view override returns (uint8) {
         return ERC20(want).decimals();
     }
+
+    /// @dev Fallback function to accept BNB.
+    receive() external payable {}
+
 }
