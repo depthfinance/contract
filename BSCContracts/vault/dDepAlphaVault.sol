@@ -124,7 +124,7 @@ contract dDepAlphaVault is ERC20,Ownable,Pausable {
             uint256 _before = IERC20(want).balanceOf(address(this));
             IAlpha(ibTokenAddress).withdraw(share);
             uint256 _after = IERC20(want).balanceOf(address(this));
-            require(_after.sub(_before)>_amount, "sub flow!");
+            require(_after.sub(_before)>=_amount, "sub flow!");
             IERC20(want).transfer(msg.sender, _amount);
         }
 
