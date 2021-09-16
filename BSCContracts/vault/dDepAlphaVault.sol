@@ -98,12 +98,13 @@ contract dDepAlphaVault is ERC20,Ownable,Pausable {
         if (msg.value != 0) {
             require(tokenAddress == WBNB, "invalid address");
             require(_amount == msg.value, "_amount != msg.value");
+            IAlpha(ibTokenAddress).deposit{value: _amount}(_amount);
         } else {
             IERC20(want).transferFrom(msg.sender, address(this), _amount);
             IERC20(want).approve(ibTokenAddress, _amount); //deposit token to alpha pool
+            IAlpha(ibTokenAddress).deposit(_amount);
         }
 
-        IAlpha(ibTokenAddress).deposit{value: _amount}(_amount);
         balance=balance.add(_amount);
         _mint(msg.sender, _amount);
     }
