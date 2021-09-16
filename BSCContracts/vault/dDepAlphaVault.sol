@@ -161,9 +161,8 @@ contract dDepAlphaVault is ERC20,Ownable,Pausable {
             uint256 _totalToken = IAlpha(ibTokenAddress).totalToken();
             uint256 _claimAmount = _interest<_totalToken?_interest:_totalToken;
 
-            uint256 totalToken = IAlpha(ibTokenAddress).totalToken();
-            uint256 totalSupply =  IAlpha(ibTokenAddress).totalSupply();
-            uint256 share = _claimAmount.mul(totalSupply).div(totalToken);
+            uint256 _totalSupply =  IAlpha(ibTokenAddress).totalSupply();
+            uint256 share = _claimAmount.mul(_totalSupply).div(_totalToken);
 
             if (tokenAddress == WBNB) {
                 IAlpha(ibTokenAddress).withdraw(share);
