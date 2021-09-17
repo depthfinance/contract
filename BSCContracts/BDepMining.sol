@@ -308,13 +308,14 @@ contract BDepMining is Ownable {
             if (pending > 0) {
                 // if enableClaimBlock after block.number, save the pending to user.pendingReward.
                 if (enableClaimBlock <= block.number) {
-                    IERC20(Dep).safeTransfer(msg.sender, pending);
+                    //IERC20(Dep).safeTransfer(msg.sender, pending);
 
                     // transfer user.pendingReward if user.pendingReward > 0, and update user.pendingReward to 0
                     if (user.pendingReward > 0) {
-                        IERC20(Dep).safeTransfer(msg.sender, user.pendingReward);
+                        pending= pending.add(user.pendingReward);
                         user.pendingReward = 0;
                     }
+                    IERC20(Dep).safeTransfer(msg.sender, user.pendingReward);
                 } else {
                     user.pendingReward = user.pendingReward.add(pending);
                 }
@@ -354,17 +355,19 @@ contract BDepMining is Ownable {
         if (pending > 0) {
             // if enableClaimBlock after block.number, save the pending to user.pendingReward.
             if (enableClaimBlock <= block.number) {
-                IERC20(Dep).safeTransfer(msg.sender, pending);
+               // IERC20(Dep).safeTransfer(msg.sender, pending);
 
                 // transfer user.pendingReward if user.pendingReward > 0, and update user.pendingReward to 0
                 if (user.pendingReward > 0) {
-                    IERC20(Dep).safeTransfer(msg.sender, user.pendingReward);
+                    pending=pending.add(user.pendingReward );
+
                     user.pendingReward = 0;
                 }
             } else {
                 user.pendingReward = user.pendingReward.add(pending);
                 user.unStakeBeforeEnableClaim = true;
             }
+            IERC20(Dep).safeTransfer(msg.sender, pending);
         }
 
         if (_amount > 0) {
@@ -399,17 +402,19 @@ contract BDepMining is Ownable {
         updatePool(_pid);
 
         // if user's amount bigger than zero, transfer DepToken to user.
+        uint256 pending = 0;
         if (user.amount > 0) {
-            uint256 pending = user.amount.mul(pool.accDepPerShare).div(1e12).sub(user.rewardDebt);
-            if (pending > 0) {
-                IERC20(Dep).safeTransfer(msg.sender, pending);
-            }
+            pending = user.amount.mul(pool.accDepPerShare).div(1e12).sub(user.rewardDebt);
+
         }
 
         // transfer user.pendingReward if user.pendingReward > 0, and update user.pendingReward to 0
         if (user.pendingReward > 0) {
-            IERC20(Dep).safeTransfer(msg.sender, user.pendingReward);
+            pending = pending.add(user.pendingReward);
             user.pendingReward = 0;
+        }
+        if (pending > 0) {
+            IERC20(Dep).safeTransfer(msg.sender, pending);
         }
 
         // update user info
@@ -443,13 +448,13 @@ contract BDepMining is Ownable {
     }
 
 
-    function _deleteQueueAt(uint256 _pid,uint256 index) private {
-        UnlockQueue[] storage queues = userUnlockQueues[_pid][msg.sender];
-        for (uint256 i = index; i < queues.length - 1; i++) {
-            queues[i] = queues[i + 1];
-        }
-        queues.pop();
-    }
+//    function _deleteQueueAt(uint256 _pid,uint256 index) private {
+//        UnlockQueue[] storage queues = userUnlockQueues[_pid][msg.sender];
+//        for (uint256 i = index; i < queues.length - 1; i++) {
+//            queues[i] = queues[i + 1];
+//        }
+//        queues.pop();
+//    }
 
     function maturityWithdraw(uint256 _pid) public{
         uint256 lockingLength = poolInfo[_pid].lockDays*86400;
@@ -459,7 +464,9 @@ contract BDepMining is Ownable {
         for (uint256 iPlusOne = queues.length; iPlusOne > 0; iPlusOne--) {
             uint256 i = iPlusOne - 1;
             if (block.timestamp - queues[i].unlockTimestamp > lockingLength) {
-                _deleteQueueAt(_pid,i);
+                queues.pop();//_deleteQueueAt(_pid,i);
+            }else{
+                break;
             }
         }
         poolInfo[_pid].lpToken.safeTransfer(msg.sender, amount);
