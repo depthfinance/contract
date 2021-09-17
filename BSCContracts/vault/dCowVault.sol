@@ -1,11 +1,13 @@
 pragma solidity ^0.8.0;
-import "./../../openzeppelin/contracts/access/Ownable.sol";
-import "./../../openzeppelin/contracts/utils/math/SafeMath.sol";
-import "./../../openzeppelin/contracts/token/ERC20/ERC20.sol";
-import "./../../openzeppelin/contracts/token/ERC20/utils/SafeERC20.sol";
-import "./../../openzeppelin/contracts/security/Pausable.sol";
+import "@openzeppelin/contracts/access/Ownable.sol";
+import "@openzeppelin/contracts/utils/math/SafeMath.sol";
+import "@openzeppelin/contracts/token/ERC20/ERC20.sol";
+import "@openzeppelin/contracts/security/Pausable.sol";
 interface IEarnTokenSwap {
     function swapTokensToEarnToken(address _token,uint256 _amount) external;
+}
+interface IDao {
+    function donateHUSD(uint256 amount) external;
 }
 interface ICow{
     function poolLength() external view returns(uint256);
@@ -15,18 +17,23 @@ interface ICow{
     function pendingCow(uint256 _poolId,address _userAddress) external view returns(uint256);
     function poolInfo(uint256 _poolId) external view returns(address,uint256,uint256,uint256,uint256,uint256,uint256,uint256,uint256,uint256,uint256);
 }
+interface IWbnb{
+    function deposit() external payable;
+    function withdraw(uint256 _amount) external;
+}
 /**depth.fi vault***/
 contract dCowVault is ERC20,Ownable,Pausable {
-    using SafeERC20 for IERC20;
     using SafeMath for uint256;
 
     address public want;
     address public earnToken =0xe9e7CEA3DedcA5984780Bafc599bD69ADd087D56;
-    address public earnAddress=0xfbaC8c66D9B7461EEfa7d8601568887c7b6f96AD;   //DEP DAO ADDRESS
+    address public teamAddress=0x01D61BE40bFF0c48A617F79e6FAC6d09D7a52aAF;
+    address public daoAddress;
     address public earnTokenSwapAddress;
     address public mdxAddress = 0x9C65AB58d8d978DB963e63f2bfB7121627e3a739;
     address public cowAddress = 0x422E3aF98bC1dE5a1838BE31A56f75DB4Ad43730;
     address public cowCtrlAddress = 0x52d22F040dEE3027422e837312320b42e1fD737f;
+    address public wbnb = 0xbb4CdB9CBd36B01bD1cBaEBF2De08d9173bc095c;
     uint256 public balance;//total token balance
     uint256 public minClaim=1;//min interest to claim
     uint256 public maxLimit;// max balance limit
@@ -53,6 +60,16 @@ contract dCowVault is ERC20,Ownable,Pausable {
         earnTokenSwapAddress = _earnTokenSwapAddress;
 
     }
+    function setTeamAddress(address _address) public onlyOwner{
+        require(_address!=address(0),"invalid address");
+        teamAddress = _address;
+    }
+
+    function setDaoAddress(address _address) public onlyOwner{
+        require(_address!=address(0),"invalid address");
+        daoAddress = _address;
+    }
+
     // set min claim interest
     function setMinClaim(uint256 _min)   external onlyOwner{
         minClaim = _min;
@@ -79,7 +96,7 @@ contract dCowVault is ERC20,Ownable,Pausable {
         if (_amount==0){
             return;
         }
-        IERC20(_token).safeApprove(earnTokenSwapAddress,_amount);
+        IERC20(_token).approve(earnTokenSwapAddress,_amount);
         IEarnTokenSwap(earnTokenSwapAddress).swapTokensToEarnToken(_token,_amount);
     }
     function getMdxAmount() public view returns(uint256){
@@ -114,17 +131,29 @@ contract dCowVault is ERC20,Ownable,Pausable {
         }
         //donate earnToken to dao
         uint256 _earnTokenBalance = IERC20(earnToken).balanceOf(address(this));
-        IERC20(earnToken).safeTransfer(earnAddress,_earnTokenBalance);
+        if (_earnTokenBalance>0){
+            if (daoAddress!=address(0)){
+                IDao(daoAddress).donateHUSD(_earnTokenBalance);
+            }else{
+                IERC20(earnToken).transfer(teamAddress,_earnTokenBalance);
+            }
+        }
 
 
     }
     //deposit
-    function deposit(uint256 _amount) external whenNotPaused {
+    function deposit(uint256 _amount) external payable whenNotPaused {
         require(_amount>0,"invalid amount");
         require(getRemaining()>=_amount,"exceed max deposit limit");
-        IERC20(want).safeTransferFrom(msg.sender, address(this), _amount);
+        //if want is wbnb,need user to deposit bnb
+        if (want==wbnb){
+            require(msg.value==_amount,"invalid amount!");
+            IWbnb(wbnb).deposit{value:msg.value}();
+        }else{
+            IERC20(want).transferFrom(msg.sender, address(this), _amount);
+        }
         //deposit token to compound
-        IERC20(want).safeApprove(cowCtrlAddress, _amount);
+        IERC20(want).approve(cowCtrlAddress, _amount);
         ICow(cowCtrlAddress).deposit(want,_amount);
         balance=balance.add(_amount);
         _mint(msg.sender, _amount);
@@ -134,8 +163,12 @@ contract dCowVault is ERC20,Ownable,Pausable {
         require(_amount>0,"invalid amount");
         _burn(msg.sender, _amount);
         ICow(cowCtrlAddress).withdraw(want,_amount);
-
-        IERC20(want).safeTransfer(msg.sender, _amount);
+        if (want==wbnb){
+            IWbnb(wbnb).withdraw(_amount);
+            payable(msg.sender).transfer(_amount);
+        }else{
+            IERC20(want).transfer(msg.sender, _amount);
+        }
         balance=balance.sub(_amount);
 
     }
@@ -151,4 +184,6 @@ contract dCowVault is ERC20,Ownable,Pausable {
     function unpause() external onlyOwner {
         _unpause();
     }
+
+    receive() external payable {}
 }
