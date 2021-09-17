@@ -38,6 +38,8 @@ contract dCowVault is ERC20,Ownable,Pausable {
     uint256 public minClaim=1;//min interest to claim
     uint256 public maxLimit;// max balance limit
     uint256 public cowPoolId;
+    event Deposit(address indexed user, uint256 amount);
+    event Withdraw(address indexed user, uint256 amount);
     constructor (address _want,address _earnTokenSwapAddress) ERC20(
         string(abi.encodePacked("Depth.Fi Vault Cow", ERC20(_want).symbol())),
         string(abi.encodePacked("dcow", ERC20(_want).symbol()))
@@ -84,12 +86,6 @@ contract dCowVault is ERC20,Ownable,Pausable {
         earnTokenSwapAddress = _address;
     }
 
-    // set dao contract address
-    function setEarnAddress(address _address)   external onlyOwner{
-        require(_address!=address(0),"no address!");
-        earnAddress = _address;
-    }
-
     function swapTokensToEarnToken(address _token) internal{
         require(earnTokenSwapAddress!=address(0),"not set earnToken swap address!");
         uint256 _amount = IERC20(_token).balanceOf(address(this));
@@ -133,6 +129,7 @@ contract dCowVault is ERC20,Ownable,Pausable {
         uint256 _earnTokenBalance = IERC20(earnToken).balanceOf(address(this));
         if (_earnTokenBalance>0){
             if (daoAddress!=address(0)){
+                IERC20(earnToken).approve(daoAddress,_earnTokenBalance);
                 IDao(daoAddress).donateHUSD(_earnTokenBalance);
             }else{
                 IERC20(earnToken).transfer(teamAddress,_earnTokenBalance);
@@ -157,6 +154,7 @@ contract dCowVault is ERC20,Ownable,Pausable {
         ICow(cowCtrlAddress).deposit(want,_amount);
         balance=balance.add(_amount);
         _mint(msg.sender, _amount);
+        emit Deposit(msg.sender, _amount);
     }
     //withdraw
     function withdraw(uint256 _amount) external {
@@ -170,7 +168,7 @@ contract dCowVault is ERC20,Ownable,Pausable {
             IERC20(want).transfer(msg.sender, _amount);
         }
         balance=balance.sub(_amount);
-
+        emit Withdraw(msg.sender, _amount);
     }
 
     function pause() external onlyOwner {
