@@ -46,15 +46,17 @@ contract dDepAlphaVault is ERC20,Ownable,Pausable {
     address public busdSwapAddress;
     address public ibTokenAddress;          // ib token address such as： Interest Bearing BUSD (ibBUSD)
     address public tokenAddress;            // address of the token to be deposited in this pool
-    address public debtTokenAddress;        // just a simple ERC20 token for staking with FairLaunch
 
     uint256 public balance;                 //total token balance
     uint256 public minClaim=1;              //min interest to claim
     uint256 public maxLimit;                // max balance limit
 
+    event Deposit(address indexed user, uint256 amount);
+    event Withdraw(address indexed user, uint256 amount);
+
     constructor (address _want, address _ibTokenAddress, address _swapAddress) ERC20(
         string(abi.encodePacked("Depth.Fi Vault Alpha", ERC20(_want).symbol())),
-        string(abi.encodePacked("bDep", ERC20(_want).symbol()))
+        string(abi.encodePacked("da", ERC20(_want).symbol()))
     ) {
 
         require(_want != address(0), "INVALID _want ADDRESS");
@@ -100,13 +102,15 @@ contract dDepAlphaVault is ERC20,Ownable,Pausable {
             require(_amount == msg.value, "_amount != msg.value");
             IAlpha(ibTokenAddress).deposit{value: _amount}(_amount);
         } else {
-            IERC20(want).transferFrom(msg.sender, address(this), _amount);
-            IERC20(want).approve(ibTokenAddress, _amount); //deposit token to alpha pool
+            IERC20(want).safeTransferFrom(msg.sender, address(this), _amount);
+            IERC20(want).safeApprove(ibTokenAddress, _amount); //deposit token to alpha pool
             IAlpha(ibTokenAddress).deposit(_amount);
         }
 
         balance=balance.add(_amount);
         _mint(msg.sender, _amount);
+
+        emit Deposit(msg.sender, _amount);
     }
 
     //withdraw busd usdt ....
@@ -126,10 +130,12 @@ contract dDepAlphaVault is ERC20,Ownable,Pausable {
             IAlpha(ibTokenAddress).withdraw(share);
             uint256 _after = IERC20(want).balanceOf(address(this));
             require(_after.sub(_before)>=_amount, "sub flow!");
-            IERC20(want).transfer(msg.sender, _amount);
+            IERC20(want).safeTransfer(msg.sender, _amount);
         }
 
         balance=balance.sub(_amount);
+
+        emit Withdraw(msg.sender, _amount);
     }
 
     function swapTokensToBusd(address _token) internal{
@@ -138,7 +144,7 @@ contract dDepAlphaVault is ERC20,Ownable,Pausable {
         if (_amount==0){
             return;
         }
-        IERC20(_token).approve(busdSwapAddress, _amount);
+        IERC20(_token).safeApprove(busdSwapAddress, _amount);
         ISwap(busdSwapAddress).swapTokensToEarnToken(_token, _amount);
     }
 
@@ -167,12 +173,12 @@ contract dDepAlphaVault is ERC20,Ownable,Pausable {
 
             if (tokenAddress == WBNB) {
                 IAlpha(ibTokenAddress).withdraw(share);
+                IWBNB(WBNB).deposit{value: address(this).balance}();
             } else {
                 uint256 _before = IERC20(want).balanceOf(address(this));
                 IAlpha(ibTokenAddress).withdraw(share);
                 uint256 _after = IERC20(want).balanceOf(address(this));
                 require(_after.sub(_before)>=_claimAmount, "sub flow!");
-
             }
 
             if (want!= busd){
