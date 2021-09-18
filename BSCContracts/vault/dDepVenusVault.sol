@@ -44,9 +44,12 @@ contract dDepVenusVault is ERC20, Ownable, Pausable {
     uint256 public balance;         //  total token balance
     uint256 public minClaim=1;      //  min interest to claim default 1
 
+    event Deposit(address indexed user, uint256 amount);
+    event Withdraw(address indexed user, uint256 amount);
+
     constructor (address _vTokenAddress, address _swapAddress) ERC20(
         string(abi.encodePacked("Depth.Fi Vault Venus", ERC20(_vTokenAddress).symbol())),
-        string(abi.encodePacked("bDep", ERC20(_vTokenAddress).symbol()))
+        string(abi.encodePacked("dv", ERC20(_vTokenAddress).symbol()))
     ) {
 
         require(_vTokenAddress != address(0), "INVALID VTOKEN ADDRESS");
@@ -86,12 +89,14 @@ contract dDepVenusVault is ERC20, Ownable, Pausable {
 
         require(_amount>0, "invalid amount");
         require(maxLimit==0 || balance.add(_amount)<=maxLimit, "exceed max deposit limit");
-        IERC20(want).transferFrom(msg.sender, address(this), _amount);
+        IERC20(want).safeTransferFrom(msg.sender, address(this), _amount);
         //deposit token to compound
-        IERC20(want).approve(vTokenAddress, _amount);
+        IERC20(want).safeApprove(vTokenAddress, _amount);
         require(VToken(vTokenAddress).mint(_amount) == 0, "!deposit");
         balance = balance.add(_amount);
         _mint(msg.sender, _amount);
+
+        emit Deposit(msg.sender, _amount);
     }
 
     //withdraw
@@ -101,8 +106,10 @@ contract dDepVenusVault is ERC20, Ownable, Pausable {
 
         //redeemUnderlying
         require(VToken(vTokenAddress).redeemUnderlying(_amount) == 0, "!withdraw");
-        IERC20(want).transfer(msg.sender, _amount);
+        IERC20(want).safeTransfer(msg.sender, _amount);
         balance = balance.sub(_amount);
+
+        emit Withdraw(msg.sender, _amount);
     }
 
     function swapTokensToBusd(address _token) internal{
@@ -111,7 +118,7 @@ contract dDepVenusVault is ERC20, Ownable, Pausable {
         if (_amount==0){
             return;
         }
-        IERC20(_token).approve(busdSwapAddress, _amount);
+        IERC20(_token).safeApprove(busdSwapAddress, _amount);
         ISwap(busdSwapAddress).swapTokensToEarnToken(_token, _amount);
     }
 
@@ -154,7 +161,7 @@ contract dDepVenusVault is ERC20, Ownable, Pausable {
         //donate husd to dao
         uint256 _busdBalance = IERC20(busd).balanceOf(address(this));
         if (_busdBalance>0) {
-            IERC20(busd).approve(daoAddress, _busdBalance);
+            IERC20(busd).safeApprove(daoAddress, _busdBalance);
             IDao(daoAddress).donateHUSD(_busdBalance);
         }
     }
