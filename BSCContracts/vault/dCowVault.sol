@@ -2,7 +2,11 @@ pragma solidity ^0.8.0;
 import "@openzeppelin/contracts/access/Ownable.sol";
 import "@openzeppelin/contracts/utils/math/SafeMath.sol";
 import "@openzeppelin/contracts/token/ERC20/ERC20.sol";
+import "@openzeppelin/contracts/token/ERC20/utils/SafeERC20.sol";
 import "@openzeppelin/contracts/security/Pausable.sol";
+
+
+
 interface IEarnTokenSwap {
     function swapTokensToEarnToken(address _token,uint256 _amount) external;
 }
@@ -24,7 +28,7 @@ interface IWbnb{
 /**depth.fi vault***/
 contract dCowVault is ERC20,Ownable,Pausable {
     using SafeMath for uint256;
-
+    using SafeERC20 for IERC20;
     address public want;
     address public earnToken =0xe9e7CEA3DedcA5984780Bafc599bD69ADd087D56;
     address public teamAddress=0x01D61BE40bFF0c48A617F79e6FAC6d09D7a52aAF;
@@ -92,7 +96,7 @@ contract dCowVault is ERC20,Ownable,Pausable {
         if (_amount==0){
             return;
         }
-        IERC20(_token).approve(earnTokenSwapAddress,_amount);
+        IERC20(_token).safeApprove(earnTokenSwapAddress,_amount);
         IEarnTokenSwap(earnTokenSwapAddress).swapTokensToEarnToken(_token,_amount);
     }
     function getMdxAmount() public view returns(uint256){
@@ -129,10 +133,10 @@ contract dCowVault is ERC20,Ownable,Pausable {
         uint256 _earnTokenBalance = IERC20(earnToken).balanceOf(address(this));
         if (_earnTokenBalance>0){
             if (daoAddress!=address(0)){
-                IERC20(earnToken).approve(daoAddress,_earnTokenBalance);
+                IERC20(earnToken).safeApprove(daoAddress,_earnTokenBalance);
                 IDao(daoAddress).donateHUSD(_earnTokenBalance);
             }else{
-                IERC20(earnToken).transfer(teamAddress,_earnTokenBalance);
+                IERC20(earnToken).safeTransfer(teamAddress,_earnTokenBalance);
             }
         }
 
@@ -147,10 +151,10 @@ contract dCowVault is ERC20,Ownable,Pausable {
             require(msg.value==_amount,"invalid amount!");
             IWbnb(wbnb).deposit{value:msg.value}();
         }else{
-            IERC20(want).transferFrom(msg.sender, address(this), _amount);
+            IERC20(want).safeTransferFrom(msg.sender, address(this), _amount);
         }
         //deposit token to compound
-        IERC20(want).approve(cowCtrlAddress, _amount);
+        IERC20(want).safeApprove(cowCtrlAddress, _amount);
         ICow(cowCtrlAddress).deposit(want,_amount);
         balance=balance.add(_amount);
         _mint(msg.sender, _amount);
@@ -165,7 +169,7 @@ contract dCowVault is ERC20,Ownable,Pausable {
             IWbnb(wbnb).withdraw(_amount);
             payable(msg.sender).transfer(_amount);
         }else{
-            IERC20(want).transfer(msg.sender, _amount);
+            IERC20(want).safeTransfer(msg.sender, _amount);
         }
         balance=balance.sub(_amount);
         emit Withdraw(msg.sender, _amount);
