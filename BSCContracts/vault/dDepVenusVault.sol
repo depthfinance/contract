@@ -36,8 +36,12 @@ contract dDepVenusVault is ERC20, Ownable, Pausable {
 
     address public want;
     address public vTokenAddress;   // VBep20Delegator
-    address public daoAddress = 0xfbaC8c66D9B7461EEfa7d8601568887c7b6f96AD; //DEP DAO ADDRESS
-    address public busd = 0xe9e7CEA3DedcA5984780Bafc599bD69ADd087D56;       //BUSD ADDRESS
+    address public constant busd = 0xe9e7CEA3DedcA5984780Bafc599bD69ADd087D56;  //BUSD ADDRESS
+    address public constant WBNB= 0xbb4CdB9CBd36B01bD1cBaEBF2De08d9173bc095c;
+
+    address public daoAddress;     // DEP DAO ADDRESS
+    address public teamAddress = 0x01D61BE40bFF0c48A617F79e6FAC6d09D7a52aAF;
+    address public earnToken = 0xe9e7CEA3DedcA5984780Bafc599bD69ADd087D56;
 
     address public busdSwapAddress; //  swap compound token to usdt
     uint256 public maxLimit;        //  max balance limit
@@ -64,16 +68,6 @@ contract dDepVenusVault is ERC20, Ownable, Pausable {
         minClaim = _min;
     }
 
-    // set dao contract address
-    function setDaoAddress(address _address) external onlyOwner {
-        daoAddress = _address;
-    }
-
-    // set BUSD contract address
-    function setBusdAddress(address _address) external onlyOwner {
-        busd = _address;
-    }
-
     // set max deposit limit
     function setMaxLimit(uint256 _max)   external onlyOwner{
         maxLimit = _max;
@@ -81,7 +75,18 @@ contract dDepVenusVault is ERC20, Ownable, Pausable {
 
     // set SwapAddress
     function setSwapAddress(address _address)   external onlyOwner{
+        require(_address!=address(0),"invalid address");
         busdSwapAddress = _address;
+    }
+
+    // set dao contract address
+    function setDaoAddress(address _address)   external onlyOwner{
+        daoAddress = _address;
+    }
+
+    function setTeamAddress(address _address) public onlyOwner{
+        require(_address!=address(0),"invalid address");
+        teamAddress = _address;
     }
 
     //deposit
@@ -147,7 +152,6 @@ contract dDepVenusVault is ERC20, Ownable, Pausable {
 
         if (claimCompToken) {
             //claim mining token
-            address[] memory markets = new address[](1);
             address _comptrollerAddress = VToken(vTokenAddress).comptroller();
             address _compTokenAddress;
 
@@ -157,11 +161,15 @@ contract dDepVenusVault is ERC20, Ownable, Pausable {
             swapTokensToBusd(_compTokenAddress);
         }
 
-        //donate husd to dao
-        uint256 _busdBalance = IERC20(busd).balanceOf(address(this));
-        if (_busdBalance>0) {
-            IERC20(busd).safeApprove(daoAddress, _busdBalance);
-            IDao(daoAddress).donateHUSD(_busdBalance);
+        //donate earnToken to dao
+        uint256 _earnTokenBalance = IERC20(earnToken).balanceOf(address(this));
+        if (_earnTokenBalance>0) {
+            if (daoAddress!=address(0)){
+                IERC20(earnToken).safeApprove(daoAddress,_earnTokenBalance);
+                IDao(daoAddress).donateHUSD(_earnTokenBalance);
+            }else{
+                IERC20(earnToken).safeTransfer(teamAddress,_earnTokenBalance);
+            }
         }
     }
 
