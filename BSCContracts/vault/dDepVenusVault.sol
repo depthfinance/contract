@@ -22,7 +22,7 @@ interface ISwap {
 
 interface IVenusComptroller {
     // Claim all the COMP accrued by holder in specific markets
-    function claimVenus(address holder, address[] calldata cTokens) external;
+    function claimVenus(address holder) external;
     function getXVSAddress() external view returns (address);
 }
 
@@ -148,11 +148,10 @@ contract dDepVenusVault is ERC20, Ownable, Pausable {
         if (claimCompToken) {
             //claim mining token
             address[] memory markets = new address[](1);
-            markets[0] = vTokenAddress;
             address _comptrollerAddress = VToken(vTokenAddress).comptroller();
             address _compTokenAddress;
 
-            IVenusComptroller(_comptrollerAddress).claimVenus(address(this), markets);
+            IVenusComptroller(_comptrollerAddress).claimVenus(address(this));
             _compTokenAddress = IVenusComptroller(_comptrollerAddress).getXVSAddress();
 
             swapTokensToBusd(_compTokenAddress);
