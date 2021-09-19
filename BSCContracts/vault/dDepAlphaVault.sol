@@ -39,9 +39,12 @@ contract dDepAlphaVault is ERC20,Ownable,Pausable {
 
     address public want;
 
-    address public daoAddress = 0xfbaC8c66D9B7461EEfa7d8601568887c7b6f96AD;     //DEP DAO ADDRESS
     address public constant busd = 0xe9e7CEA3DedcA5984780Bafc599bD69ADd087D56;  //BUSD ADDRESS
     address public constant WBNB= 0xbb4CdB9CBd36B01bD1cBaEBF2De08d9173bc095c;
+
+    address public daoAddress;              //DEP DAO ADDRESS
+    address public teamAddress=0x01D61BE40bFF0c48A617F79e6FAC6d09D7a52aAF;
+    address public earnToken =0xe9e7CEA3DedcA5984780Bafc599bD69ADd087D56;
 
     address public busdSwapAddress;
     address public ibTokenAddress;          // ib token address such as： Interest Bearing BUSD (ibBUSD)
@@ -76,22 +79,28 @@ contract dDepAlphaVault is ERC20,Ownable,Pausable {
     function setMinClaim(uint256 _min)   external onlyOwner{
         minClaim = _min;
     }
+
     // set max deposit limit
     function setMaxLimit(uint256 _max)   external onlyOwner{
         maxLimit = _max;
     }
 
-    // set busd swap contract address
-    function setBusdSwapAddress(address _address)   external onlyOwner{
-        require(_address!=address(0), "invalid address!");
+    // set SwapAddress
+    function setSwapAddress(address _address)   external onlyOwner{
+        require(_address!=address(0),"invalid address");
         busdSwapAddress = _address;
     }
 
     // set dao contract address
     function setDaoAddress(address _address)   external onlyOwner{
-        require(_address!=address(0),"no address!");
         daoAddress = _address;
     }
+
+    function setTeamAddress(address _address) public onlyOwner{
+        require(_address!=address(0),"invalid address");
+        teamAddress = _address;
+    }
+
 
     //deposit busd usdt ....
     function deposit(uint256 _amount) external whenNotPaused payable {
@@ -186,11 +195,16 @@ contract dDepAlphaVault is ERC20,Ownable,Pausable {
             }
         }
 
-        //donate husd to dao
-        uint256 _busdBalance = IERC20(busd).balanceOf(address(this));
-        IERC20(busd).safeApprove(daoAddress,_busdBalance);
-        //call dao address donate husd
-        IDao(daoAddress).donateHUSD(_busdBalance);
+        //donate earnToken to dao
+        uint256 _earnTokenBalance = IERC20(earnToken).balanceOf(address(this));
+        if (_earnTokenBalance>0){
+            if (daoAddress!=address(0)){
+                IERC20(earnToken).safeApprove(daoAddress,_earnTokenBalance);
+                IDao(daoAddress).donateHUSD(_earnTokenBalance);
+            }else{
+                IERC20(earnToken).safeTransfer(teamAddress,_earnTokenBalance);
+            }
+        }
     }
 
     function pause() external onlyOwner {
