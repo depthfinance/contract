@@ -17,6 +17,7 @@ interface IAlpha {
     function withdraw(uint256 amount) external;
 
     function balanceOf(address) external view returns (uint256);
+    function approve(address spender, uint256 amount) external returns (bool);
 }
 
 interface ISwap {
@@ -33,6 +34,15 @@ interface IWBNB{
     function withdraw(uint) external;
 }
 
+interface IMining {
+
+    function deposit(address _for, uint256 _pid, uint256 _amount) external;
+
+    function withdraw(address _for, uint256 _pid, uint256 _amount) external;
+
+    function harvest(uint256 _pid) external;
+}
+
 contract dDepAlphaVault is ERC20,Ownable,Pausable {
     using SafeERC20 for IERC20;
     using SafeMath for uint256;
@@ -40,7 +50,8 @@ contract dDepAlphaVault is ERC20,Ownable,Pausable {
     address public want;
 
     address public constant busd = 0xe9e7CEA3DedcA5984780Bafc599bD69ADd087D56;  //BUSD ADDRESS
-    address public constant WBNB= 0xbb4CdB9CBd36B01bD1cBaEBF2De08d9173bc095c;
+    address public constant WBNB = 0xbb4CdB9CBd36B01bD1cBaEBF2De08d9173bc095c;
+    address public constant ALPACA = 0x8F0528cE5eF7B51152A59745bEfDD91D97091d2F; // AlpacaToken (ALPACA)
 
     address public daoAddress;              //DEP DAO ADDRESS
     address public teamAddress=0x01D61BE40bFF0c48A617F79e6FAC6d09D7a52aAF;
@@ -49,24 +60,29 @@ contract dDepAlphaVault is ERC20,Ownable,Pausable {
     address public busdSwapAddress;
     address public ibTokenAddress;          // ib token address such as： Interest Bearing BUSD (ibBUSD)
     address public tokenAddress;            // address of the token to be deposited in this pool
+    address public miningAddress;           // ibToken mining address
+    uint256 public miningPid;               // mining pool pid
 
-    uint256 public balance;                 //total token balance
-    uint256 public minClaim=1;              //min interest to claim
+    uint256 public balance;                 // total token balance
+    uint256 public minClaim=1;              // min interest to claim
     uint256 public maxLimit;                // max balance limit
 
     event Deposit(address indexed user, uint256 amount);
     event Withdraw(address indexed user, uint256 amount);
 
-    constructor (address _want, address _ibTokenAddress, address _swapAddress) ERC20(
+    constructor (address _want, address _ibTokenAddress, address _swapAddress, address _miningAddress, uint256 _pid) ERC20(
         string(abi.encodePacked("Depth.Fi Vault Alpha", ERC20(_want).symbol())),
         string(abi.encodePacked("da", ERC20(_want).symbol()))
     ) {
-
         require(_want != address(0), "INVALID _want ADDRESS");
         require(_ibTokenAddress != address(0), "INVALID _ibTokenAddress ADDRESS");
+        require(_swapAddress != address(0), "INVALID _swapAddress ADDRESS");
+        require(_miningAddress != address(0), "INVALID _miningAddress ADDRESS");
 
         want = _want;
         ibTokenAddress = _ibTokenAddress;
+        miningAddress = _miningAddress;
+        miningPid = _pid;
 
         address _tokenAddress = IAlpha(_ibTokenAddress).token(); // BUSD USDT WBNB...
         tokenAddress = _tokenAddress;
@@ -76,24 +92,35 @@ contract dDepAlphaVault is ERC20,Ownable,Pausable {
     }
 
     // set min claim interest
-    function setMinClaim(uint256 _min)   external onlyOwner{
+    function setMinClaim(uint256 _min) external onlyOwner{
         minClaim = _min;
     }
 
     // set max deposit limit
-    function setMaxLimit(uint256 _max)   external onlyOwner{
+    function setMaxLimit(uint256 _max) external onlyOwner{
         maxLimit = _max;
     }
 
     // set SwapAddress
-    function setSwapAddress(address _address)   external onlyOwner{
+    function setSwapAddress(address _address) external onlyOwner{
         require(_address!=address(0),"invalid address");
         busdSwapAddress = _address;
     }
 
     // set dao contract address
-    function setDaoAddress(address _address)   external onlyOwner{
+    function setDaoAddress(address _address) external onlyOwner{
         daoAddress = _address;
+    }
+
+    // set miningAddress
+    function setMiningAddress(address _address) external onlyOwner{
+        require(_address!=address(0),"invalid address");
+        miningAddress = _address;
+    }
+
+    // set miningPid
+    function setPid(uint256 _pid) external onlyOwner{
+        miningPid = _pid;
     }
 
     function setTeamAddress(address _address) public onlyOwner{
@@ -101,6 +128,22 @@ contract dDepAlphaVault is ERC20,Ownable,Pausable {
         teamAddress = _address;
     }
 
+    function getShare(uint256 _amount) internal view returns (uint256) {
+        require(_amount>0, "invalid amount");
+
+        uint256 totalToken = IAlpha(ibTokenAddress).totalToken();
+        uint256 total = totalToken.sub(_amount);
+
+        uint256 totalSupply = IAlpha(ibTokenAddress).totalSupply();
+        uint256 share = total == 0 ? _amount : _amount.mul(totalSupply).div(total);
+        return share;
+    }
+
+    function ibTokenMining(uint256 share) internal {
+        require(share>0, "invalid share");
+        IAlpha(ibTokenAddress).approve(miningAddress, share);
+        IMining(miningAddress).deposit(address(this), miningPid, share);
+    }
 
     //deposit busd usdt ....
     function deposit(uint256 _amount) external whenNotPaused payable {
@@ -110,10 +153,18 @@ contract dDepAlphaVault is ERC20,Ownable,Pausable {
             require(tokenAddress == WBNB, "invalid address");
             require(_amount == msg.value, "_amount != msg.value");
             IAlpha(ibTokenAddress).deposit{value: _amount}(_amount);
+
+            // ibtoken mining
+            uint256 share = getShare(_amount);
+            ibTokenMining(share);
         } else {
             IERC20(want).safeTransferFrom(msg.sender, address(this), _amount);
             IERC20(want).safeApprove(ibTokenAddress, _amount); //deposit token to alpha pool
             IAlpha(ibTokenAddress).deposit(_amount);
+
+            // ibtoken mining
+            uint256 share = getShare(_amount);
+            ibTokenMining(share);
         }
 
         balance=balance.add(_amount);
@@ -127,14 +178,19 @@ contract dDepAlphaVault is ERC20,Ownable,Pausable {
         require(_amount>0, "invalid amount");
         _burn(msg.sender, _amount);
 
-        uint256 totalToken = IAlpha(ibTokenAddress).totalToken();
-        uint256 totalSupply = IAlpha(ibTokenAddress).totalSupply();
-        uint256 share = _amount.mul(totalSupply).div(totalToken);
+        uint256 share = getShare(_amount);
 
         if (tokenAddress == WBNB) {
+
+            IMining(miningAddress).withdraw(address(this), miningPid, share);
+
             IAlpha(ibTokenAddress).withdraw(share);
             payable(msg.sender).transfer(_amount);
+
         } else {
+
+            IMining(miningAddress).withdraw(address(this), miningPid, share);
+
             uint256 _before = IERC20(want).balanceOf(address(this));
             IAlpha(ibTokenAddress).withdraw(share);
             uint256 _after = IERC20(want).balanceOf(address(this));
@@ -193,6 +249,11 @@ contract dDepAlphaVault is ERC20,Ownable,Pausable {
             if (want!= busd){
                 swapTokensToBusd(want);
             }
+
+            uint256 abalance = IERC20(ALPACA).balanceOf(address(this));
+            if (abalance > 0) {
+                swapTokensToBusd(ALPACA);
+            }
         }
 
         //donate earnToken to dao
@@ -205,6 +266,10 @@ contract dDepAlphaVault is ERC20,Ownable,Pausable {
                 IERC20(earnToken).safeTransfer(teamAddress,_earnTokenBalance);
             }
         }
+    }
+
+    function claimAlpaca() external {
+        IMining(miningAddress).harvest(miningPid);
     }
 
     function pause() external onlyOwner {
