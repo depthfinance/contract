@@ -30,7 +30,91 @@ interface IDao {
     function donateHUSD(uint256 amount) external;
 }
 
-contract dDepVenusVault is ERC20, Ownable, Pausable {
+interface IComptroller {
+    /*** Treasury Data ***/
+    function treasuryAddress() external view returns (address);
+    function treasuryPercent() external view returns (uint);
+}
+
+contract CarefulMath {
+
+    /**
+     * @dev Possible error codes that we can return
+     */
+    enum MathError {
+        NO_ERROR,
+        DIVISION_BY_ZERO,
+        INTEGER_OVERFLOW,
+        INTEGER_UNDERFLOW
+    }
+
+    /**
+    * @dev Multiplies two numbers, returns an error on overflow.
+    */
+    function mulUInt(uint a, uint b) internal pure returns (MathError, uint) {
+        if (a == 0) {
+            return (MathError.NO_ERROR, 0);
+        }
+
+        uint c = a * b;
+
+        if (c / a != b) {
+            return (MathError.INTEGER_OVERFLOW, 0);
+        } else {
+            return (MathError.NO_ERROR, c);
+        }
+    }
+
+    /**
+    * @dev Integer division of two numbers, truncating the quotient.
+    */
+    function divUInt(uint a, uint b) internal pure returns (MathError, uint) {
+        if (b == 0) {
+            return (MathError.DIVISION_BY_ZERO, 0);
+        }
+
+        return (MathError.NO_ERROR, a / b);
+    }
+
+    /**
+    * @dev Subtracts two numbers, returns an error on overflow (i.e. if subtrahend is greater than minuend).
+    */
+    function subUInt(uint a, uint b) internal pure returns (MathError, uint) {
+        if (b <= a) {
+            return (MathError.NO_ERROR, a - b);
+        } else {
+            return (MathError.INTEGER_UNDERFLOW, 0);
+        }
+    }
+
+    /**
+    * @dev Adds two numbers, returns an error on overflow.
+    */
+    function addUInt(uint a, uint b) internal pure returns (MathError, uint) {
+        uint c = a + b;
+
+        if (c >= a) {
+            return (MathError.NO_ERROR, c);
+        } else {
+            return (MathError.INTEGER_OVERFLOW, 0);
+        }
+    }
+
+    /**
+    * @dev add a and b and then subtract c
+    */
+    function addThenSubUInt(uint a, uint b, uint c) internal pure returns (MathError, uint) {
+        (MathError err0, uint sum) = addUInt(a, b);
+
+        if (err0 != MathError.NO_ERROR) {
+            return (err0, 0);
+        }
+
+        return subUInt(sum, c);
+    }
+}
+
+contract dDepVenusVault is ERC20, Ownable, Pausable, CarefulMath{
     using SafeERC20 for IERC20;
     using SafeMath for uint256;
 
@@ -104,6 +188,15 @@ contract dDepVenusVault is ERC20, Ownable, Pausable {
         emit Deposit(msg.sender, _amount);
     }
 
+    struct RedeemLocalVars {
+        MathError mathErr;
+        uint exchangeRateMantissa;
+        uint redeemTokens;
+        uint redeemAmount;
+        uint totalSupplyNew;
+        uint accountTokensNew;
+    }
+
     //withdraw
     function withdraw(uint256 _amount) external {
         require(_amount>0, "invalid amount");
@@ -111,6 +204,29 @@ contract dDepVenusVault is ERC20, Ownable, Pausable {
 
         //redeemUnderlying
         require(VToken(vTokenAddress).redeemUnderlying(_amount) == 0, "!withdraw");
+        address _comptrollerAddress = VToken(vTokenAddress).comptroller();
+        if (IComptroller(address(_comptrollerAddress)).treasuryPercent() != 0) {
+
+            RedeemLocalVars memory vars;
+            vars.redeemAmount = _amount;
+
+            uint feeAmount;
+            uint remainedAmount;
+            (vars.mathErr, feeAmount) = mulUInt(vars.redeemAmount, IComptroller(address(_comptrollerAddress)).treasuryPercent());
+            if (vars.mathErr != CarefulMath.MathError.NO_ERROR) {
+                return;
+            }
+
+            (vars.mathErr, feeAmount) = divUInt(feeAmount, 1e18);
+            if (vars.mathErr != CarefulMath.MathError.NO_ERROR) {
+                return;
+            }
+
+            (vars.mathErr, remainedAmount) = subUInt(vars.redeemAmount, feeAmount);
+
+            _amount = remainedAmount;
+        }
+
         IERC20(want).safeTransfer(msg.sender, _amount);
         balance = balance.sub(_amount);
 
