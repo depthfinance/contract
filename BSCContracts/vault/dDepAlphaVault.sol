@@ -17,7 +17,6 @@ interface IAlpha {
     function withdraw(uint256 amount) external;
 
     function balanceOf(address) external view returns (uint256);
-    function approve(address spender, uint256 amount) external returns (bool);
 }
 
 interface ISwap {
@@ -133,15 +132,14 @@ contract dDepAlphaVault is ERC20,Ownable,Pausable {
 
         uint256 totalToken = IAlpha(ibTokenAddress).totalToken();
         uint256 total = totalToken.sub(_amount);
-
         uint256 totalSupply = IAlpha(ibTokenAddress).totalSupply();
-        uint256 share = total == 0 ? _amount : _amount.mul(totalSupply).div(total);
+        uint256 share = total == 0 ? _amount : _amount.mul(totalSupply).div(totalToken);
         return share;
     }
 
     function ibTokenMining(uint256 share) internal {
         require(share>0, "invalid share");
-        IAlpha(ibTokenAddress).approve(miningAddress, share);
+        IERC20(ibTokenAddress).safeApprove(miningAddress, share);
         IMining(miningAddress).deposit(address(this), miningPid, share);
     }
 
@@ -179,22 +177,16 @@ contract dDepAlphaVault is ERC20,Ownable,Pausable {
         _burn(msg.sender, _amount);
 
         uint256 share = getShare(_amount);
+        IMining(miningAddress).withdraw(address(this), miningPid, share);
+
+        uint256 _before = IERC20(want).balanceOf(address(this));
+        IAlpha(ibTokenAddress).withdraw(share);
+        uint256 _after = IERC20(want).balanceOf(address(this));
+        require(_after.sub(_before)>=_amount, "sub flow!");
 
         if (tokenAddress == WBNB) {
-
-            IMining(miningAddress).withdraw(address(this), miningPid, share);
-
-            IAlpha(ibTokenAddress).withdraw(share);
             payable(msg.sender).transfer(_amount);
-
         } else {
-
-            IMining(miningAddress).withdraw(address(this), miningPid, share);
-
-            uint256 _before = IERC20(want).balanceOf(address(this));
-            IAlpha(ibTokenAddress).withdraw(share);
-            uint256 _after = IERC20(want).balanceOf(address(this));
-            require(_after.sub(_before)>=_amount, "sub flow!");
             IERC20(want).safeTransfer(msg.sender, _amount);
         }
 
