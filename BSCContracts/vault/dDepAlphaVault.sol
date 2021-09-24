@@ -40,6 +40,8 @@ interface IMining {
     function withdraw(address _for, uint256 _pid, uint256 _amount) external;
 
     function harvest(uint256 _pid) external;
+
+    function withdrawAll(address _for, uint256 _pid) external;
 }
 
 contract dDepAlphaVault is ERC20,Ownable,Pausable {
@@ -179,14 +181,17 @@ contract dDepAlphaVault is ERC20,Ownable,Pausable {
         uint256 share = getShare(_amount);
         IMining(miningAddress).withdraw(address(this), miningPid, share);
 
-        uint256 _before = IERC20(want).balanceOf(address(this));
-        IAlpha(ibTokenAddress).withdraw(share);
-        uint256 _after = IERC20(want).balanceOf(address(this));
-        require(_after.sub(_before)>=_amount, "sub flow!");
-
         if (tokenAddress == WBNB) {
+            uint256 _before = address(this).balance;
+            IAlpha(ibTokenAddress).withdraw(share);
+            uint256 _after = address(this).balance;
+            require(_after.sub(_before)>=_amount, "sub flow!");
             payable(msg.sender).transfer(_amount);
         } else {
+            uint256 _before = IERC20(want).balanceOf(address(this));
+            IAlpha(ibTokenAddress).withdraw(share);
+            uint256 _after = IERC20(want).balanceOf(address(this));
+            require(_after.sub(_before)>=_amount, "sub flow!");
             IERC20(want).safeTransfer(msg.sender, _amount);
         }
 
@@ -216,6 +221,8 @@ contract dDepAlphaVault is ERC20,Ownable,Pausable {
     }
 
     function harvest() public {
+
+        IMining(miningAddress).withdrawAll(address(this), miningPid);
 
         uint256 _selfUnderlying = getSelfUnderlying();
         uint256 _interest = _selfUnderlying.sub(balance);
@@ -247,6 +254,9 @@ contract dDepAlphaVault is ERC20,Ownable,Pausable {
                 swapTokensToBusd(ALPACA);
             }
         }
+
+        uint256 ibAmount = IAlpha(ibTokenAddress).balanceOf(address(this));
+        ibTokenMining(ibAmount);
 
         //donate earnToken to dao
         uint256 _earnTokenBalance = IERC20(earnToken).balanceOf(address(this));
