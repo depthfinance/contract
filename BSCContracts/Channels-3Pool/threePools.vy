@@ -353,7 +353,7 @@ def _donate_dao():
     for i in range(N_COINS - 1):
         # calculation
         index:int128 = i + 1
-        if cERC20(self.c_tokens[index]).balanceOf(self) * cERC20(self.c_tokens[index]).exchangeRateStored() / PRECISION > PRECISION - self.balances[index]:
+        if cERC20(self.c_tokens[index]).balanceOf(self) * cERC20(self.c_tokens[index]).exchangeRateStored() / PRECISION > self.balances[index]:
             rates: uint256[N_COINS] = RATES
             xp: uint256[N_COINS] = self._xp()
             dx: uint256 = cERC20(self.c_tokens[index]).balanceOf(self) * cERC20(self.c_tokens[index]).exchangeRateStored() / PRECISION - self.balances[index]
@@ -369,13 +369,13 @@ def _donate_dao():
         redeem_amount: uint256 = cERC20(self.c_tokens[0]).balanceOf(self) * cERC20(self.c_tokens[0]).exchangeRateStored() / PRECISION - self.balances[0]
         cERC20(self.c_tokens[0]).redeemUnderlying(redeem_amount)
 
-    husd_balance: uint256 = ERC20(self.coins[0]).balanceOf(self)
-    if husd_balance > 0:
+    busd_balance: uint256 = ERC20(self.coins[0]).balanceOf(self)
+    if busd_balance > 0:
         if self.send_reward_to_dao: 
-            ERC20(self.coins[0]).approve(self.dao, husd_balance)
-            DAO(self.dao).donateHUSD(husd_balance)
+            ERC20(self.coins[0]).approve(self.dao, busd_balance)
+            DAO(self.dao).donateHUSD(busd_balance)
         else:
-            ERC20(self.coins[0]).transfer(self.team_address, husd_balance)
+            ERC20(self.coins[0]).transfer(self.team_address, busd_balance)
 
 @external
 @nonreentrant('lock')
