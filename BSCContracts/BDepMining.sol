@@ -4,10 +4,11 @@ import "@openzeppelin/contracts/access/Ownable.sol";
 import "@openzeppelin/contracts/utils/math/SafeMath.sol";
 import "@openzeppelin/contracts/token/ERC20/ERC20.sol";
 import "@openzeppelin/contracts/token/ERC20/utils/SafeERC20.sol";
+import "@openzeppelin/contracts/security/Pausable.sol";
 interface DepToken{
     function mint(address _to, uint256 _amount) external;
 }
-contract BDepMining is Ownable {
+contract BDepMining is Ownable,Pausable {
 
     using SafeMath for uint256;
     using SafeERC20 for IERC20;
@@ -294,7 +295,7 @@ contract BDepMining is Ownable {
     }
 
     // Stake LP tokens to DepBreeder for WPC allocation.
-    function stake(uint256 _pid, uint256 _amount) public {
+    function stake(uint256 _pid, uint256 _amount) external whenNotPaused{
 
         PoolInfo storage pool = poolInfo[_pid];
         UserInfo storage user = userInfo[_pid][msg.sender];
@@ -368,7 +369,7 @@ contract BDepMining is Ownable {
                 user.pendingReward = user.pendingReward.add(pending);
                 user.unStakeBeforeEnableClaim = true;
             }
-            
+
         }
 
         if (_amount > 0) {
@@ -492,5 +493,12 @@ contract BDepMining is Ownable {
             sum += _queues[i].amount;
         }
         return sum;
+    }
+
+    function pause() external onlyOwner {
+        _pause();
+    }
+    function unpause() external onlyOwner {
+        _unpause();
     }
 }
