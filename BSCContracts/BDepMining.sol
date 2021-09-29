@@ -136,7 +136,20 @@ contract BDepMining is Ownable,Pausable {
         //update poolInfo
         poolInfo[_pid].allocPoint = _allocPoint;
     }
+    // Update the given pool's Dep allocation point. Can only be called by the owner.
+    function setAllocPoints(uint256[][] memory _allocPoints, bool _withUpdate) public onlyOwner {
+        if (_withUpdate) {
+            massUpdatePools();
+        }
+        for(uint256 i=0;i<_allocPoints.length;i++){
+            uint256 _pid = _allocPoints[i][0];
+            uint256 _allocPoint = _allocPoints[i][1];
+            totalAllocPoint = totalAllocPoint.sub(poolInfo[_pid].allocPoint).add(_allocPoint);
+            poolInfo[_pid].allocPoint = _allocPoint;
+        }
 
+
+    }
     // update reduce rate
     function setReduceRate(uint256 _reduceRate, bool _withUpdate) public onlyOwner {
         if (_withUpdate) {
